@@ -108,14 +108,13 @@ REPO_LIST-y += ../$(THIS_REPO)
 export REPO_LIST = $(REPO_LIST-y)
 
 # Where we get pieces from...
-SRC_DIR=source
 
-INCLUDE_DIRS-y += -I./$(SRC_DIR)
-
+INCLUDE_DIRS-y += -Iinclude
+INCLUDE_DIRS-y += -Isource
 
 # C Source files
 SOURCE-y                                     := 
-SOURCE-y                                     += $(SRC_DIR)/printf2/printf2.c
+SOURCE-y                                     += source/printf2/printf2.c
 
 SOURCE := $(SOURCE-y)
 

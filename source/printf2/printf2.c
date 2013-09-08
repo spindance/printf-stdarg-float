@@ -59,11 +59,13 @@
 // #define  TEST_PRINTF    1
 
 #include <string.h>
+#include "printf2/printf2.h"
+
 #ifdef TEST_PRINTF
 #include <stdio.h>
+extern int putchar (int c);
 #endif
 
-extern int putchar (int c);
 //lint -e534  Ignoring return value of function 
 //lint -e539  Did not expect positive indentation from line ...
 //lint -e525  Negative indentation from line ...
@@ -466,7 +468,7 @@ int stringf (char *out, const char *format, ...)
 //lint -esym(714, stringfn)
 //lint -esym(759, stringfn)
 //lint -esym(765, stringfn)
-int stringfn(char *out, uint max_len, const char *format, ...)
+int stringfn(char *out, unsigned int max_len, const char *format, ...)
 {
    max_output_len = (int) max_len ;
    curr_output_len = 0 ;
