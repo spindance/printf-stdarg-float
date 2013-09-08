@@ -1,0 +1,73 @@
+#
+# Makefile
+#
+# CROSS_COMPILE specify the prefix used for all executables used
+# during compilation. Only gcc and related bin-utils executables
+# are prefixed with $(CROSS_COMPILE).
+#
+# CROSS_COMPILE can be set on the command line:
+#   make CROSS_COMPILE=arm-none-eabi-
+# or defeated:
+#   make CROSS_COMPILE=
+#
+# ARCH is the target architecture.
+
+ifndef CROSS_COMPILE
+CROSS_COMPILE	= arm-none-eabi-
+endif
+
+# Make variables (CC, etc...)
+
+AS		= $(CROSS_COMPILE)as
+LD		= $(CROSS_COMPILE)ld
+CC		= $(CROSS_COMPILE)gcc
+CPP		= $(CC) -E
+AR		= $(CROSS_COMPILE)ar
+NM		= $(CROSS_COMPILE)nm
+STRIP		= $(CROSS_COMPILE)strip
+OBJCOPY		= $(CROSS_COMPILE)objcopy
+OBJDUMP		= $(CROSS_COMPILE)objdump
+GDB             = $(CROSS_COMPILE)gdb
+
+CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage
+
+$(BUILD_DIR)%.o: %.c
+	@echo "+--$(CC) $<"
+	$(Q)mkdir -p $(dir $@)
+	$(Q)$(CC) $(CFLAGS) -o $@ $<
+
+#
+# The rule for building the object file from each assembly source file.
+#
+$(BUILD_DIR)%.o: %.S
+	@echo "+--$(AS) $<"
+	$(Q)mkdir -p $(dir $@)
+	$(Q)$(CC) $(AFLAGS) -o $@ -c $<
+
+#
+# The rule for creating an object library.
+#
+$(BUILD_DIR)%.a:
+	@echo "+--$(AR) $@"
+	$(Q)mkdir -p $(dir $@)
+	$(Q)$(AR) -cr $@ $^
+
+#
+# The rule for linking the application.
+#
+$(TOP_BUILD_DIR)%.axf:
+	@echo "+--$(LD) $@ $(LDSCRIPT)"
+	$(Q)$(LD) -T $(LDSCRIPT) $(LDFLAGS) -o $@ $(filter %.o %.a, $(^)) $(LD_LIBS)
+
+%.bin: %.axf
+	@echo "+--$(OBJCOPY) -O binary $< $@"
+	$(Q)$(OBJCOPY) -O binary $< $@
+
+#
+# The rule for turning text files into c includes;
+#
+TEXTTOC=sed -f src/httpd-fs/text-to-c-strings.sed
+
+src/httpd-fs/%_html.h: src/httpd-fs/html/%.html
+	@echo "+--convert $< to .h"
+	$(Q)$(TEXTTOC) $< > $@

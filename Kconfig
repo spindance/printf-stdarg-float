@@ -1,0 +1,11 @@
+#
+# For a description of the syntax of this configuration file,
+# see misc/tools/kconfig-language.txt.
+#
+
+mainmenu "Printf2 Configuration"
+
+config CONFIGURED
+    bool
+    default y
+
