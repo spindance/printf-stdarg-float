@@ -15,7 +15,11 @@
 #ifndef _PRINTF2_H
 #define _PRINTF2_H
 
-int stringf (char *out, const char *format, ...);
-int stringfn(char *out, unsigned int max_len, const char *format, ...);
+#include <stdarg.h>
+
+int stringf  (char *out, const char *format, ...);
+int stringfn (char *out, unsigned int max_len, const char *format, ...);
+int stringfnp(char *out, unsigned int max_len, const char *format, int * argPtr);
+
 
 #endif

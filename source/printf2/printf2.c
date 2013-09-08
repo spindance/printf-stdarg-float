@@ -73,24 +73,20 @@ extern int putchar (int c);
 typedef  unsigned char  u8 ;
 typedef  unsigned int   uint ;
 
-static uint use_leading_plus = 0 ;
-
-static int max_output_len = -1 ;
-static int curr_output_len = 0 ;
 
 //****************************************************************************
-static void printchar (char **str, int c)
+static void printchar (char **str, int c, unsigned int max_output_len, int *cur_output_char_p)
 {
-   if (max_output_len >= 0  &&  curr_output_len >= max_output_len)
+   if (max_output_len >= 0  &&  *cur_output_char_p >= max_output_len)
       return ;
 	if (str) {
-      **str = (char) c;
+		**str = (char) c;
 		++(*str);
-      curr_output_len++ ;
+		(*cur_output_char_p)++ ;
 	}
 #ifdef TEST_PRINTF
    else {
-      curr_output_len++ ;
+     (*cur_output_char_p)++ ;
       (void) putchar (c);
    }
 #endif
@@ -112,7 +108,7 @@ static const double round_nums[8] = {
    0.00000005
 } ;
 
-static unsigned dbl2stri(char *outbfr, double dbl, unsigned dec_digits)
+static unsigned dbl2stri(char *outbfr, double dbl, unsigned dec_digits, int use_leading_plus)
 {
    static char local_bfr[128] ;
    char *output = (outbfr == 0) ? local_bfr : outbfr ;
@@ -203,7 +199,7 @@ static unsigned dbl2stri(char *outbfr, double dbl, unsigned dec_digits)
 #define  PAD_RIGHT   1
 #define  PAD_ZERO    2
 
-static int prints (char **out, const char *string, int width, int pad)
+static int prints (char **out, const char *string, int width, int pad, unsigned int max_output_len, int *cur_output_char_p)
 {
 	register int pc = 0, padchar = ' ';
 	if (width > 0) {
@@ -220,16 +216,16 @@ static int prints (char **out, const char *string, int width, int pad)
 	}
 	if (!(pad & PAD_RIGHT)) {
 		for (; width > 0; --width) {
-			printchar (out, padchar);
+			printchar (out, padchar, max_output_len, cur_output_char_p);
 			++pc;
 		}
 	}
 	for (; *string; ++string) {
-		printchar (out, *string);
+		printchar (out, *string, max_output_len, cur_output_char_p);
 		++pc;
 	}
 	for (; width > 0; --width) {
-		printchar (out, padchar);
+		printchar (out, padchar, max_output_len,cur_output_char_p);
 		++pc;
 	}
 	return pc;
@@ -238,7 +234,7 @@ static int prints (char **out, const char *string, int width, int pad)
 //****************************************************************************
 /* the following should be enough for 32 bit int */
 #define PRINT_BUF_LEN 12
-static int printi (char **out, int i, uint base, int sign, int width, int pad, int letbase)
+static int printi (char **out, int i, uint base, int sign, int width, int pad, int letbase, unsigned int max_output_len, int *cur_output_char_p, int use_leading_plus)
 {
 	char print_buf[PRINT_BUF_LEN];
    char *s;
@@ -247,7 +243,7 @@ static int printi (char **out, int i, uint base, int sign, int width, int pad, i
 	if (i == 0) {
 		print_buf[0] = '0';
 		print_buf[1] = '\0';
-		return prints (out, print_buf, width, pad);
+		return prints (out, print_buf, width, pad, max_output_len, cur_output_char_p);
 	}
    if (sign && base == 10 && i < 0) {
 		neg = 1;
@@ -266,7 +262,7 @@ static int printi (char **out, int i, uint base, int sign, int width, int pad, i
 	}
 	if (neg) {
 		if (width && (pad & PAD_ZERO)) {
-			printchar (out, '-');
+			printchar (out, '-', max_output_len, cur_output_char_p);
 			++pc;
 			--width;
 		}
@@ -278,11 +274,11 @@ static int printi (char **out, int i, uint base, int sign, int width, int pad, i
          *--s = '+';
       }
    }
-	return pc + prints (out, s, width, pad);
+	return pc + prints (out, s, width, pad, max_output_len, cur_output_char_p);
 }
 
 //****************************************************************************
-static int print (char **out, int *varg)
+static int print (char **out, unsigned int max_output_len, int *varg)
 {
    int post_decimal ;
    int width, pad ;
@@ -290,7 +286,10 @@ static int print (char **out, int *varg)
    int pc = 0;
    char *format = (char *) (*varg++);
    char scr[2];
-   use_leading_plus = 0 ;  //  start out with this clear
+   int cur_output_char = 0;
+   int *cur_output_char_p = &cur_output_char;
+   int use_leading_plus = 0 ;  //  start out with this clear
+
 	for (; *format != 0; ++format) {
 		if (*format == '%') {
          dec_width = 6 ;
@@ -342,32 +341,32 @@ static int print (char **out, int *varg)
             {
             // char *s = *((char **) varg++);   //lint !e740
             char *s = (char *) *varg++ ;  //lint !e740 !e826  
-            pc += prints (out, s ? s : "(null)", width, pad);
+            pc += prints (out, s ? s : "(null)", width, pad, max_output_len, cur_output_char_p);
             use_leading_plus = 0 ;  //  reset this flag after printing one value
             }
             break;
          case 'd':
-            pc += printi (out, *varg++, 10, 1, width, pad, 'a');
+	    pc += printi (out, *varg++, 10, 1, width, pad, 'a', max_output_len, cur_output_char_p, use_leading_plus);
             use_leading_plus = 0 ;  //  reset this flag after printing one value
             break;
          case 'x':
-            pc += printi (out, *varg++, 16, 0, width, pad, 'a');
+	    pc += printi (out, *varg++, 16, 0, width, pad, 'a', max_output_len, cur_output_char_p, use_leading_plus);
             use_leading_plus = 0 ;  //  reset this flag after printing one value
             break;
          case 'X':
-            pc += printi (out, *varg++, 16, 0, width, pad, 'A');
+	    pc += printi (out, *varg++, 16, 0, width, pad, 'A', max_output_len, cur_output_char_p, use_leading_plus);
             use_leading_plus = 0 ;  //  reset this flag after printing one value
             break;
          case 'p':
          case 'u':
-            pc += printi (out, *varg++, 10, 0, width, pad, 'a');
+	    pc += printi (out, *varg++, 10, 0, width, pad, 'a', max_output_len, cur_output_char_p, use_leading_plus);
             use_leading_plus = 0 ;  //  reset this flag after printing one value
             break;
          case 'c':
             /* char are converted to int then pushed on the stack */
             scr[0] = (char) *varg++;
             scr[1] = '\0';
-            pc += prints (out, scr, width, pad);
+            pc += prints (out, scr, width, pad, max_output_len, cur_output_char_p);
             use_leading_plus = 0 ;  //  reset this flag after printing one value
             break;
 
@@ -392,16 +391,16 @@ static int print (char **out, int *varg)
             varg = (int *) dblptr ;    //lint !e740  copy updated pointer back to base pointer
             char bfr[81] ;
             // unsigned slen =
-            dbl2stri(bfr, dbl, dec_width) ;
+            dbl2stri(bfr, dbl, dec_width, use_leading_plus) ;
             // stuff_talkf("[%s], width=%u, dec_width=%u\n", bfr, width, dec_width) ;
-            pc += prints (out, bfr, width, pad);
+            pc += prints (out, bfr, width, pad, max_output_len, cur_output_char_p);
             use_leading_plus = 0 ;  //  reset this flag after printing one value
             }
             break;
 
          default:
-            printchar (out, '%');
-            printchar (out, *format);
+	    printchar (out, '%', max_output_len, cur_output_char_p);
+	    printchar (out, *format, max_output_len, cur_output_char_p);
             use_leading_plus = 0 ;  //  reset this flag after printing one value
             break;
          }
@@ -411,7 +410,7 @@ static int print (char **out, int *varg)
       // } else 
       {
 out_lbl:
-			printchar (out, *format);
+			printchar (out, *format, max_output_len, cur_output_char_p);
 			++pc;
 		}
    }  //  for each char in format string
@@ -428,10 +427,8 @@ out_lbl:
 #ifdef TEST_PRINTF
 int termf (const char *format, ...)
 {
-   max_output_len = -1 ;
-   curr_output_len = 0 ;
    int *varg = (int *) (char *) (&format);
-   return print (0, varg);
+   return print (0, -1, varg);
 }  //lint !e715
 #endif
 
@@ -443,25 +440,21 @@ int termf (const char *format, ...)
 #ifdef TEST_PRINTF
 int termfn(uint max_len, const char *format, ...)
 {
-   max_output_len = (int) max_len ;
-   curr_output_len = 0 ;
    int *varg = (int *) (char *) (&format);
-   return print (0, varg);
+   return print (0, max_len, varg);
 }  //lint !e715
 #endif
 
 //****************************************************************************
 int stringf (char *out, const char *format, ...)
 {
-   max_output_len = -1 ;
-   curr_output_len = 0 ;
    //  create a pointer into the stack.
    //  Thematically this should be a void*, since the actual usage of the
    //  pointer will vary.  However, int* works fine too.
    //  Either way, the called function will need to re-cast the pointer
    //  for any type which isn't sizeof(int)
    int *varg = (int *) (char *) (&format);
-   return print (&out, varg);
+   return print (&out, -1, varg);
 }
 
 //****************************************************************************
@@ -470,15 +463,19 @@ int stringf (char *out, const char *format, ...)
 //lint -esym(765, stringfn)
 int stringfn(char *out, unsigned int max_len, const char *format, ...)
 {
-   max_output_len = (int) max_len ;
-   curr_output_len = 0 ;
    //  create a pointer into the stack.
    //  Thematically this should be a void*, since the actual usage of the
    //  pointer will vary.  However, int* works fine too.
    //  Either way, the called function will need to re-cast the pointer
    //  for any type which isn't sizeof(int)
    int *varg = (int *) (char *) (&format);
-   return print (&out, varg);
+   return print (&out, max_len, varg);
+}
+
+//****************************************************************************
+int stringfnp(char *out, unsigned int max_len, const char *format, int * argPtr)
+{
+   return print (&out, max_len, argPtr);
 }
 
 
