@@ -44,33 +44,24 @@
 //  compile command for stand-alone mode (TEST_PRINTF)
 //  gcc -Wall -O2 -DTEST_PRINTF -s printf2.c -o printf2.exe
 //*******************************************************************************
+//*******************************************************************************
+//  Updated by SpinDance Inc.  Changes to the original Menie code are
+//  Copyright 2013 SpinDance Inc.
+//  All such changes are distributed under the same license as the original,
+//  as described above.
+//  09/07/13 - Removed references to USE_INTERNALS.
+//  09/07/13 - Use a standard strlen.
+//*******************************************************************************
 
 //lint -esym(752, debug_output)
 //lint -esym(766, stdio.h)
 
 // #define  TEST_PRINTF    1
 
+#include <string.h>
 #ifdef TEST_PRINTF
 #include <stdio.h>
-#include <string.h>
-#undef  USE_INTERNALS
-#else
-//  USE_INTERNALS implements code for company-specific linkages
-//  at the company that I currently work for.
-//  Other users will *not* want this defined!!
-#define  USE_INTERNALS
 #endif
-
-#ifdef   USE_INTERNALS
-#include <stdio.h>
-#include <string.h>
-
-#include <remap.h>
-#include <91x_lib.h>
-
-#include "common.h"
-
-#else
 
 extern int putchar (int c);
 //lint -e534  Ignoring return value of function 
@@ -79,7 +70,6 @@ extern int putchar (int c);
 
 typedef  unsigned char  u8 ;
 typedef  unsigned int   uint ;
-#endif
 
 static uint use_leading_plus = 0 ;
 
@@ -87,9 +77,6 @@ static int max_output_len = -1 ;
 static int curr_output_len = 0 ;
 
 //****************************************************************************
-#ifndef TEST_PRINTF
-static void printchar (char **str, int c) HIGHSEG
-#endif
 static void printchar (char **str, int c)
 {
    if (max_output_len >= 0  &&  curr_output_len >= max_output_len)
@@ -111,12 +98,8 @@ static void printchar (char **str, int c)
 //  This version returns the length of the output string.
 //  It is more useful when implementing a walking-string function.
 //****************************************************************************
-#ifdef TEST_PRINTF
-static const double round_nums[8] = {
-#else   
 //lint -esym(728, round_nums)
-static const double round_nums[8] HIGHRO = {
-#endif   
+static const double round_nums[8] = {
    0.5,
    0.05,
    0.005,
@@ -127,9 +110,6 @@ static const double round_nums[8] HIGHRO = {
    0.00000005
 } ;
 
-#ifndef TEST_PRINTF
-static unsigned dbl2stri(char *outbfr, double dbl, unsigned dec_digits) HIGHSEG
-#endif
 static unsigned dbl2stri(char *outbfr, double dbl, unsigned dec_digits)
 {
    static char local_bfr[128] ;
@@ -213,20 +193,14 @@ static unsigned dbl2stri(char *outbfr, double dbl, unsigned dec_digits)
 
    //  prepare output
    output = (outbfr == 0) ? local_bfr : outbfr ;
-#ifdef TEST_PRINTF
+
    return strlen(output) ;
-#else
-   return my_strlen(output) ;
-#endif
 }
 
 //****************************************************************************
 #define  PAD_RIGHT   1
 #define  PAD_ZERO    2
 
-#ifndef TEST_PRINTF
-static int prints (char **out, const char *string, int width, int pad) HIGHSEG
-#endif
 static int prints (char **out, const char *string, int width, int pad)
 {
 	register int pc = 0, padchar = ' ';
@@ -262,9 +236,6 @@ static int prints (char **out, const char *string, int width, int pad)
 //****************************************************************************
 /* the following should be enough for 32 bit int */
 #define PRINT_BUF_LEN 12
-#ifndef TEST_PRINTF
-static int printi (char **out, int i, uint base, int sign, int width, int pad, int letbase) HIGHSEG
-#endif
 static int printi (char **out, int i, uint base, int sign, int width, int pad, int letbase)
 {
 	char print_buf[PRINT_BUF_LEN];
@@ -309,9 +280,6 @@ static int printi (char **out, int i, uint base, int sign, int width, int pad, i
 }
 
 //****************************************************************************
-#ifndef TEST_PRINTF
-static int print (char **out, int *varg) HIGHSEG
-#endif
 static int print (char **out, int *varg)
 {
    int post_decimal ;
@@ -481,9 +449,6 @@ int termfn(uint max_len, const char *format, ...)
 #endif
 
 //****************************************************************************
-#ifndef TEST_PRINTF
-int stringf (char *out, const char *format, ...) HIGHSEG
-#endif
 int stringf (char *out, const char *format, ...)
 {
    max_output_len = -1 ;
@@ -501,9 +466,6 @@ int stringf (char *out, const char *format, ...)
 //lint -esym(714, stringfn)
 //lint -esym(759, stringfn)
 //lint -esym(765, stringfn)
-#ifndef TEST_PRINTF
-int stringfn(char *out, uint max_len, const char *format, ...) HIGHSEG
-#endif
 int stringfn(char *out, uint max_len, const char *format, ...)
 {
    max_output_len = (int) max_len ;
@@ -517,27 +479,6 @@ int stringfn(char *out, uint max_len, const char *format, ...)
    return print (&out, varg);
 }
 
-//********************************************************************
-//  On Windows platform, try to redefine printf/fprintf
-//  so we can output code to a debug window.
-//  Also, shadow syslog() within OutputDebugStringA()
-//  Note: printf() remapping was unreliable,
-//  but syslog worked great.
-//********************************************************************
-#ifdef   USE_INTERNALS
-#ifndef TEST_PRINTF
-int stuff_talkf(const char *format, ...) HIGHSEG
-#endif
-int stuff_talkf(const char *format, ...)
-{
-   char consoleBuffer[TALK_LINE_LEN+1] ;
-   char *out = consoleBuffer ;
-   int *varg = (int *) (char *) (&format);
-   print (&out, varg);
-   stuff_talk(consoleBuffer) ;
-   return 1;
-}
-#endif
 
 //****************************************************************************
 #ifdef TEST_PRINTF
