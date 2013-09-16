@@ -179,9 +179,14 @@ OBJS_DIRS = $(sort $(addprefix $(BUILD_DIR), $(dir $SOURCE)))
 DEPS = $(addprefix $(BUILD_DIR), $(SOURCE:.c=.d))
 OBJS = $(addprefix $(BUILD_DIR), $(SOURCE:.c=.o))
 
+
+SEP = '-----------------------------------------------------------------------+-'
+
+
 .PHONY: all
 
 all: obj/printf2.a
+	@# This line prevents warning when nothing to be done for all.
 
 ifndef MAKECMDGOALS
 -include $(DEPS)
@@ -190,7 +195,7 @@ ifneq ($(MAKECMDGOALS),$(filter $(MAKECMDGOALS),\
 "help repos repostatus \
 menuconfig clean distclean config nconfig menuconfig \
 oldconfig silentoldconfig savedefconfig allnoconfig allyesconfig \
-alldefconfig randconfig listnewconfig olddefconfig"))
+alldefconfig randconfig listnewconfig olddefconfig "))
 #
 # Include the dependencies if they are available
 # and we are not invoked with one of the targets:
@@ -261,6 +266,9 @@ doxygen :
 .PHONY: clean
 clean :
 ifneq ($(strip $(TOP_BUILD_DIR)),)
+	@echo $(SEP)
+	@echo "+--printf-stdarg-float library clean"
+	@echo $(SEP)
 	$(RM) -fr $(TOP_BUILD_DIR)*
 else
 	$(Q)echo "TOP_BUILD_DIR is not defined or empty, can't clean."
@@ -268,6 +276,9 @@ endif
 
 .PHONY: distclean
 distclean : clean
+	@echo $(SEP)
+	@echo "+--printf-stdarg-float library distclean"
+	@echo $(SEP)
 	find . -name "*~" -exec rm -f {} \;
 	find . -name "*.o" -exec rm -f {} \;
 
