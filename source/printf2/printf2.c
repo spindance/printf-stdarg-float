@@ -51,6 +51,7 @@
 //  as described above.
 //  09/07/13 - Removed references to USE_INTERNALS.
 //  09/07/13 - Use a standard strlen.
+//  09/18/13 - Added stringfnp().
 //*******************************************************************************
 
 //lint -esym(752, debug_output)
