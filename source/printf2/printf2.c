@@ -97,6 +97,107 @@ static void printchar (char **str, int c, unsigned int max_output_len, int *cur_
 //  This version returns the length of the output string.
 //  It is more useful when implementing a walking-string function.
 //****************************************************************************
+#ifdef USE_FLOATING_POINT
+//lint -esym(728, round_nums)
+static const float round_nums[8] = {
+   0.5,
+   0.05,
+   0.005,
+   0.0005,
+   0.00005,
+   0.000005,
+   0.0000005,
+   0.00000005
+} ;
+
+static unsigned flt2stri(char *outbfr, float flt, unsigned dec_digits, int use_leading_plus)
+{
+   static char local_bfr[128] ;
+   char *output = (outbfr == 0) ? local_bfr : outbfr ;
+
+   //*******************************************
+   //  extract negative info
+   //*******************************************
+   if (flt < 0.0) {
+      *output++ = '-' ;
+      flt *= -1.0 ;
+   } else {
+      if (use_leading_plus) {
+         *output++ = '+' ;
+      }
+      
+   }
+
+   //  handling rounding by adding .5LSB to the floating-point data
+   if (dec_digits < 8) {
+      flt += round_nums[dec_digits] ;
+   }
+
+   //**************************************************************************
+   //  construct fractional multiplier for specified number of digits.
+   //**************************************************************************
+   uint mult = 1 ;
+   uint idx ;
+   for (idx=0; idx < dec_digits; idx++)
+      mult *= 10 ;
+
+   // printf("mult=%u\n", mult) ;
+   uint wholeNum = (uint) flt ;
+   uint decimalNum = (uint) ((flt - wholeNum) * mult);
+
+   //*******************************************
+   //  convert integer portion
+   //*******************************************
+   char tbfr[40] ;
+   idx = 0 ;
+   while (wholeNum != 0) {
+      tbfr[idx++] = '0' + (wholeNum % 10) ;
+      wholeNum /= 10 ;
+   }
+   // printf("%.3f: whole=%s, dec=%d\n", dbl, tbfr, decimalNum) ;
+   if (idx == 0) {
+      *output++ = '0' ;
+   } else {
+      while (idx > 0) {
+         *output++ = tbfr[idx-1] ;  //lint !e771
+         idx-- ;
+      }
+   }
+   if (dec_digits > 0) {
+      *output++ = '.' ;
+
+      //*******************************************
+      //  convert fractional portion
+      //*******************************************
+      idx = 0 ;
+      while (decimalNum != 0) {
+         tbfr[idx++] = '0' + (decimalNum % 10) ;
+         decimalNum /= 10 ;
+      }
+      //  pad the decimal portion with 0s as necessary;
+      //  We wouldn't want to report 3.093 as 3.93, would we??
+      while (idx < dec_digits) {
+         tbfr[idx++] = '0' ;
+      }
+      // printf("decimal=%s\n", tbfr) ;
+      if (idx == 0) {
+         *output++ = '0' ;
+      } else {
+         while (idx > 0) {
+            *output++ = tbfr[idx-1] ;
+            idx-- ;
+         }
+      }
+   }
+   *output = 0 ;
+
+   //  prepare output
+   output = (outbfr == 0) ? local_bfr : outbfr ;
+
+   return strlen(output) ;
+}
+
+#else // USE_DOUBLES
 //lint -esym(728, round_nums)
 static const double round_nums[8] = {
    0.5,
@@ -195,6 +296,7 @@ static unsigned dbl2stri(char *outbfr, double dbl, unsigned dec_digits, int use_
 
    return strlen(output) ;
 }
+#endif
 
 //****************************************************************************
 #define  PAD_RIGHT   1
@@ -378,6 +480,22 @@ static int print (char **out, unsigned int max_output_len, int *varg)
             // 
             // The ARM EABI requires 8-byte stack alignment at public function entry points, 
             // compared to the previous 4-byte alignment.
+#ifdef USE_FLOATING_POINT
+#ifdef USE_NEWLIB
+            char *cptr = (char *) varg;  //lint !e740 !e826  convert to double pointer
+            uint caddr = (uint) cptr;
+            if ((caddr & 0xF) != 0) {
+               cptr += 4;
+            }
+            float *fltptr = (float *) cptr;  //lint !e740 !e826  convert to float pointer
+#else
+            float *fltptr = (float *) varg;  //lint !e740 !e826  convert to float pointer
+#endif
+            float flt = *fltptr++;   //  increment double pointer
+            varg = (int *) fltptr;    //lint !e740  copy updated pointer back to base pointer
+            char bfr[81];
+            flt2stri(bfr, flt, dec_width, use_leading_plus);
+#else // USE_DOUBLES
 #ifdef USE_NEWLIB               
             char *cptr = (char *) varg ;  //lint !e740 !e826  convert to double pointer
             uint caddr = (uint) cptr ;
@@ -391,9 +509,8 @@ static int print (char **out, unsigned int max_output_len, int *varg)
             double dbl = *dblptr++ ;   //  increment double pointer
             varg = (int *) dblptr ;    //lint !e740  copy updated pointer back to base pointer
             char bfr[81] ;
-            // unsigned slen =
             dbl2stri(bfr, dbl, dec_width, use_leading_plus) ;
-            // stuff_talkf("[%s], width=%u, dec_width=%u\n", bfr, width, dec_width) ;
+#endif
             pc += prints (out, bfr, width, pad, max_output_len, cur_output_char_p);
             use_leading_plus = 0 ;  //  reset this flag after printing one value
             }
@@ -505,10 +622,16 @@ int main (void)
    slen += stringf(buf+slen, "left=[%-4d], ", -3) ;
    slen += stringf(buf+slen, "right=[%4d]\n", -3) ;
    termf ("[%d] %s", slen, buf);
-   termf("+ format: int: %+d, %+d, double: %+.1f, %+.1f, reset: %d, %.1f\n", 3, -3, 3.0, -3.0, 3, 3.0) ;
 
-   stringf (buf, "%.2f is a double\n", 3.31) ;
+#ifdef USE_FLOATING_POINT
+   termf("+ format: int: %+d, %+d, float: %+.1f, %+.1f, reset: %d, %.1f\n", 3, -3, 3.0f, -3.0f, 3, 3.0);
+   stringf (buf, "%.3f is a float, %.2f is with two decimal places\n", 3.345f, 3.345f);
    termf ("%s", buf);
+#else // USE_DOUBLES
+   termf("+ format: int: %+d, %+d, double: %+.1f, %+.1f, reset: %d, %.1f\n", 3, -3, 3.0, -3.0, 3, 3.0);
+   stringf (buf, "%.3f is a double, %.2f is with two decimal places\n", 3.345, 3.345);
+   termf ("%s", buf);
+#endif
 
    stringf (buf, "multiple unsigneds: %u %u %2u %X\n", 15, 5, 23, 0xB38F) ;
    termf ("%s", buf);
@@ -516,6 +639,19 @@ int main (void)
    stringf (buf, "multiple chars: %c %c %c %c\n", 'a', 'b', 'c', 'd') ;
    termf ("%s", buf);
 
+#ifdef USE_FLOATING_POINT
+   termf("\nFloats:\n");
+   stringf (buf, "multiple floats: %f %.1f %2.0f %.2f %.3f %.2f [%-8.3f]\n",
+                  3.45f, 3.93f, 2.45f, -1.1f, 3.093f, 13.72f, -4.382f) ;
+   termf ("%s", buf);
+   stringf (buf, "float special cases: %f %.f %.0f %2f %2.f %2.0f\n",
+                  3.14159f, 3.14159f, 3.14159f, 3.14159f, 3.14159f, 3.14159f) ;
+   termf ("%s", buf);
+   stringf (buf, "rounding floats: %.1f %.1f %.3f %.2f [%-8.3f]\n",
+                  3.93f, 3.96f, 3.0988f, 3.999f, -4.382f) ;
+   termf ("%s", buf);
+#else // USE_DOUBLES
+   termf("\nDoubles:\n");
    stringf (buf, "multiple doubles: %f %.1f %2.0f %.2f %.3f %.2f [%-8.3f]\n",
                   3.45, 3.93, 2.45, -1.1, 3.093, 13.72, -4.382) ;
    termf ("%s", buf);
@@ -525,6 +661,8 @@ int main (void)
    stringf (buf, "rounding doubles: %.1f %.1f %.3f %.2f [%-8.3f]\n",
                   3.93, 3.96, 3.0988, 3.999, -4.382) ;
    termf ("%s", buf);
+#endif
+   termf("\n");
 
    termfn(20, "%s", "no more than 20 bytes of this string should be displayed!");
    termf ("\n");

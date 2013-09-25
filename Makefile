@@ -167,6 +167,7 @@ CFLAGS-$(CONFIG_TOOLCHAIN_DEBUG)      += -g
 CFLAGS = $(CFLAGS-y)
 
 CPPFLAGS-y                                    += -D ALIGN_STRUCT_END=__attribute\(\(aligned\(4\)\)\)
+CPPFLAGS-y                                    += -D USE_FLOATING_POINT
 CPPFLAGS-y                                    += $(INCLUDE_DIRS-y)
 
 CFLAGS += $(CPPFLAGS-y)
