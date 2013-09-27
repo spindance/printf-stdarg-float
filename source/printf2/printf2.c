@@ -67,6 +67,12 @@
 extern int putchar (int c);
 #endif
 
+#ifdef USE_FLOATING_POINT
+  #define FLOAT_OR_DOUBLE float
+#else
+  #define FLOAT_OR_DOUBLE double
+#endif
+
 //lint -e534  Ignoring return value of function 
 //lint -e539  Did not expect positive indentation from line ...
 //lint -e525  Negative indentation from line ...
@@ -97,9 +103,8 @@ static void printchar (char **str, int c, unsigned int max_output_len, int *cur_
 //  This version returns the length of the output string.
 //  It is more useful when implementing a walking-string function.
 //****************************************************************************
-#ifdef USE_FLOATING_POINT
 //lint -esym(728, round_nums)
-static const float round_nums[8] = {
+static const FLOAT_OR_DOUBLE round_nums[8] = {
    0.5,
    0.05,
    0.005,
@@ -110,7 +115,7 @@ static const float round_nums[8] = {
    0.00000005
 } ;
 
-static unsigned flt2stri(char *outbfr, float flt, unsigned dec_digits, int use_leading_plus)
+static unsigned fltordbl2stri(char *outbfr, FLOAT_OR_DOUBLE flt_or_dbl, unsigned dec_digits, int use_leading_plus)
 {
    static char local_bfr[128] ;
    char *output = (outbfr == 0) ? local_bfr : outbfr ;
@@ -118,9 +123,9 @@ static unsigned flt2stri(char *outbfr, float flt, unsigned dec_digits, int use_l
    //*******************************************
    //  extract negative info
    //*******************************************
-   if (flt < 0.0) {
+   if (flt_or_dbl < 0.0) {
       *output++ = '-' ;
-      flt *= -1.0 ;
+      flt_or_dbl *= -1.0 ;
    } else {
       if (use_leading_plus) {
          *output++ = '+' ;
@@ -130,7 +135,7 @@ static unsigned flt2stri(char *outbfr, float flt, unsigned dec_digits, int use_l
 
    //  handling rounding by adding .5LSB to the floating-point data
    if (dec_digits < 8) {
-      flt += round_nums[dec_digits] ;
+      flt_or_dbl += round_nums[dec_digits] ;
    }
 
    //**************************************************************************
@@ -142,8 +147,8 @@ static unsigned flt2stri(char *outbfr, float flt, unsigned dec_digits, int use_l
       mult *= 10 ;
 
    // printf("mult=%u\n", mult) ;
-   uint wholeNum = (uint) flt ;
-   uint decimalNum = (uint) ((flt - wholeNum) * mult);
+   uint wholeNum = (uint) flt_or_dbl ;
+   uint decimalNum = (uint) ((flt_or_dbl - wholeNum) * mult);
 
    //*******************************************
    //  convert integer portion
@@ -196,107 +201,6 @@ static unsigned flt2stri(char *outbfr, float flt, unsigned dec_digits, int use_l
 
    return strlen(output) ;
 }
-
-#else // USE_DOUBLES
-//lint -esym(728, round_nums)
-static const double round_nums[8] = {
-   0.5,
-   0.05,
-   0.005,
-   0.0005,
-   0.00005,
-   0.000005,
-   0.0000005,
-   0.00000005
-} ;
-
-static unsigned dbl2stri(char *outbfr, double dbl, unsigned dec_digits, int use_leading_plus)
-{
-   static char local_bfr[128] ;
-   char *output = (outbfr == 0) ? local_bfr : outbfr ;
-
-   //*******************************************
-   //  extract negative info
-   //*******************************************
-   if (dbl < 0.0) {
-      *output++ = '-' ;
-      dbl *= -1.0 ;
-   } else {
-      if (use_leading_plus) {
-         *output++ = '+' ;
-      }
-      
-   }
-
-   //  handling rounding by adding .5LSB to the floating-point data
-   if (dec_digits < 8) {
-      dbl += round_nums[dec_digits] ;
-   }
-
-   //**************************************************************************
-   //  construct fractional multiplier for specified number of digits.
-   //**************************************************************************
-   uint mult = 1 ;
-   uint idx ;
-   for (idx=0; idx < dec_digits; idx++)
-      mult *= 10 ;
-
-   // printf("mult=%u\n", mult) ;
-   uint wholeNum = (uint) dbl ;
-   uint decimalNum = (uint) ((dbl - wholeNum) * mult);
-
-   //*******************************************
-   //  convert integer portion
-   //*******************************************
-   char tbfr[40] ;
-   idx = 0 ;
-   while (wholeNum != 0) {
-      tbfr[idx++] = '0' + (wholeNum % 10) ;
-      wholeNum /= 10 ;
-   }
-   // printf("%.3f: whole=%s, dec=%d\n", dbl, tbfr, decimalNum) ;
-   if (idx == 0) {
-      *output++ = '0' ;
-   } else {
-      while (idx > 0) {
-         *output++ = tbfr[idx-1] ;  //lint !e771
-         idx-- ;
-      }
-   }
-   if (dec_digits > 0) {
-      *output++ = '.' ;
-
-      //*******************************************
-      //  convert fractional portion
-      //*******************************************
-      idx = 0 ;
-      while (decimalNum != 0) {
-         tbfr[idx++] = '0' + (decimalNum % 10) ;
-         decimalNum /= 10 ;
-      }
-      //  pad the decimal portion with 0s as necessary;
-      //  We wouldn't want to report 3.093 as 3.93, would we??
-      while (idx < dec_digits) {
-         tbfr[idx++] = '0' ;
-      }
-      // printf("decimal=%s\n", tbfr) ;
-      if (idx == 0) {
-         *output++ = '0' ;
-      } else {
-         while (idx > 0) {
-            *output++ = tbfr[idx-1] ;
-            idx-- ;
-         }
-      }
-   }
-   *output = 0 ;
-
-   //  prepare output
-   output = (outbfr == 0) ? local_bfr : outbfr ;
-
-   return strlen(output) ;
-}
-#endif
 
 //****************************************************************************
 #define  PAD_RIGHT   1
@@ -480,37 +384,20 @@ static int print (char **out, unsigned int max_output_len, int *varg)
             // 
             // The ARM EABI requires 8-byte stack alignment at public function entry points, 
             // compared to the previous 4-byte alignment.
-#ifdef USE_FLOATING_POINT
 #ifdef USE_NEWLIB
             char *cptr = (char *) varg;  //lint !e740 !e826  convert to double pointer
             uint caddr = (uint) cptr;
             if ((caddr & 0xF) != 0) {
                cptr += 4;
             }
-            float *fltptr = (float *) cptr;  //lint !e740 !e826  convert to float pointer
+            float *flt_or_dbl_ptr = (float *) cptr;  //lint !e740 !e826  convert to float pointer
 #else
-            float *fltptr = (float *) varg;  //lint !e740 !e826  convert to float pointer
+            float *flt_or_dbl_ptr = (float *) varg;  //lint !e740 !e826  convert to float pointer
 #endif
-            float flt = *fltptr++;   //  increment double pointer
-            varg = (int *) fltptr;    //lint !e740  copy updated pointer back to base pointer
+            float flt_or_dbl = *flt_or_dbl_ptr++;   //  increment double pointer
+            varg = (int *) flt_or_dbl_ptr;    //lint !e740  copy updated pointer back to base pointer
             char bfr[81];
-            flt2stri(bfr, flt, dec_width, use_leading_plus);
-#else // USE_DOUBLES
-#ifdef USE_NEWLIB               
-            char *cptr = (char *) varg ;  //lint !e740 !e826  convert to double pointer
-            uint caddr = (uint) cptr ;
-            if ((caddr & 0xF) != 0) {
-               cptr += 4 ;
-            }
-            double *dblptr = (double *) cptr ;  //lint !e740 !e826  convert to double pointer
-#else
-            double *dblptr = (double *) varg ;  //lint !e740 !e826  convert to double pointer
-#endif
-            double dbl = *dblptr++ ;   //  increment double pointer
-            varg = (int *) dblptr ;    //lint !e740  copy updated pointer back to base pointer
-            char bfr[81] ;
-            dbl2stri(bfr, dbl, dec_width, use_leading_plus) ;
-#endif
+            fltordbl2stri(bfr, flt_or_dbl, dec_width, use_leading_plus);
             pc += prints (out, bfr, width, pad, max_output_len, cur_output_char_p);
             use_leading_plus = 0 ;  //  reset this flag after printing one value
             }
@@ -605,6 +492,7 @@ int main (void)
    char *ptr = "Hello world!";
    char *np = 0;
    char buf[128];
+
    termf ("ptr=%s, %s is null pointer, char %c='a'\n", ptr, np, 'a');
    termf ("hex %x = ff, hex02=%02x\n", 0xff, 2);   //  hex handling
    termf ("signed %d = %uU = 0x%X\n", -3, -3, -3);   //  int formats
