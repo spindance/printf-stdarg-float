@@ -419,9 +419,13 @@ out_lbl:
 			++pc;
 		}
    }  //  for each char in format string
-   if (out) //lint !e850
-		**out = '\0';
-	return pc;
+   if (out && (pc == max_output_len)){
+      (*out)--;
+      **out = '\0';
+   } else if (out) {
+      **out = '\0';
+   }
+   return pc;
 }
 
 //****************************************************************************
@@ -492,7 +496,11 @@ int main (void)
    char *ptr = "Hello world!";
    char *np = 0;
    char buf[128];
+   char buf2[10];
 
+   stringfn(buf2, 10, "0123456789") ;   // Only 9 chars should be displayed
+   termf ("%s", buf2);
+   termf ("\n");
    termf ("ptr=%s, %s is null pointer, char %c='a'\n", ptr, np, 'a');
    termf ("hex %x = ff, hex02=%02x\n", 0xff, 2);   //  hex handling
    termf ("signed %d = %uU = 0x%X\n", -3, -3, -3);   //  int formats
