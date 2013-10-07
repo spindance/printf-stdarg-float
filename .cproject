@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<?fileVersion 4.0.0?>
+
+<cproject storage_type_id="org.eclipse.cdt.core.XmlProjectDescriptionStorage">
+	<storageModule moduleId="org.eclipse.cdt.core.settings">
+		<cconfiguration id="cdt.managedbuild.toolchain.gnu.cross.base.1619635427">
+			<storageModule buildSystemId="org.eclipse.cdt.managedbuilder.core.configurationDataProvider" id="cdt.managedbuild.toolchain.gnu.cross.base.1619635427" moduleId="org.eclipse.cdt.core.settings" name="Default">
+				<externalSettings/>
+				<extensions>
+					<extension id="org.eclipse.cdt.core.ELF" point="org.eclipse.cdt.core.BinaryParser"/>
+					<extension id="org.eclipse.cdt.core.GmakeErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+					<extension id="org.eclipse.cdt.core.CWDLocator" point="org.eclipse.cdt.core.ErrorParser"/>
+					<extension id="org.eclipse.cdt.core.GCCErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+					<extension id="org.eclipse.cdt.core.GASErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+					<extension id="org.eclipse.cdt.core.GLDErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+				</extensions>
+			</storageModule>
+			<storageModule moduleId="cdtBuildSystem" version="4.0.0">
+				<configuration buildProperties="" description="" id="cdt.managedbuild.toolchain.gnu.cross.base.1619635427" name="Default" parent="org.eclipse.cdt.build.core.emptycfg">
+					<folderInfo id="cdt.managedbuild.toolchain.gnu.cross.base.1619635427.1679475204" name="/" resourcePath="">
+						<toolChain id="cdt.managedbuild.toolchain.gnu.cross.base.1266788632" name="cdt.managedbuild.toolchain.gnu.cross.base" superClass="cdt.managedbuild.toolchain.gnu.cross.base">
+							<option id="cdt.managedbuild.option.gnu.cross.prefix.127463773" name="Prefix" superClass="cdt.managedbuild.option.gnu.cross.prefix"/>
+							<option id="cdt.managedbuild.option.gnu.cross.path.680352387" name="Path" superClass="cdt.managedbuild.option.gnu.cross.path"/>
+							<targetPlatform archList="all" binaryParser="org.eclipse.cdt.core.ELF" id="cdt.managedbuild.targetPlatform.gnu.cross.1894709263" isAbstract="false" osList="all" superClass="cdt.managedbuild.targetPlatform.gnu.cross"/>
+							<builder id="cdt.managedbuild.builder.gnu.cross.1942651338" keepEnvironmentInBuildfile="false" managedBuildOn="false" name="Gnu Make Builder" superClass="cdt.managedbuild.builder.gnu.cross"/>
+							<tool id="cdt.managedbuild.tool.gnu.cross.c.compiler.298106961" name="Cross GCC Compiler" superClass="cdt.managedbuild.tool.gnu.cross.c.compiler">
+								<option id="gnu.c.compiler.option.include.paths.2066570203" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" valueType="includePath">
+									<listOptionValue builtIn="false" value="../../chaney.aculink.bridge.app/include"/>
+									<listOptionValue builtIn="false" value="../../chaney.aculink.bridge.app/include/generated"/>
+									<listOptionValue builtIn="false" value="../../chaney.aculink.bridge.app/source"/>
+									<listOptionValue builtIn="false" value="../../lwipdemo/include"/>
+									<listOptionValue builtIn="false" value="../../lwipdemo/include/generated"/>
+									<listOptionValue builtIn="false" value="../../lwipdemo/source"/>
+									<listOptionValue builtIn="false" value="../../chaney.aculink.bridge.stm32PeripheralLib/Libraries/CMSIS/Include"/>
+									<listOptionValue builtIn="false" value="../../chaney.aculink.bridge.stm32PeripheralLib/Libraries/CMSIS/Device/ST/STM32F4xx/Include"/>
+									<listOptionValue builtIn="false" value="../../chaney.aculink.bridge.stm32Drivers/eth/inc"/>
+									<listOptionValue builtIn="false" value="../../chaney.aculink.bridge.stm32PeripheralLib/Libraries/STM32F4xx_StdPeriph_Driver/inc"/>
+									<listOptionValue builtIn="false" value="../../chaney.aculink.bridge.stm32PeripheralLib/Utilities/STM32_EVAL/Common"/>
+									<listOptionValue builtIn="false" value="../../chaney.aculink.bridge.stm32PeripheralLib/Utilities/STM32_EVAL/STM3240_41_G_EVAL"/>
+									<listOptionValue builtIn="false" value="../../chaney.aculink.bridge.freertos/FreeRTOS/Source/include"/>
+									<listOptionValue builtIn="false" value="../../lwip-contrib/apps/httpserver_raw/"/>
+									<listOptionValue builtIn="false" value="../../chaney.aculink.bridge.STM32F4x7_ETH_LwIP/Project/FreeRTOS/httpserver_socket/inc"/>
+									<listOptionValue builtIn="false" value="../../printf-stdarg-float/source/printf2"/>
+									<listOptionValue builtIn="false" value="../../chaney.aculink.bridge.freertos/FreeRTOS/Source/portable/GCC/ARM_CM3"/>
+									<listOptionValue builtIn="false" value="../../lwip-contrib/ports/cross/src/include/LM3S"/>
+									<listOptionValue builtIn="false" value="../../lwip/src/include"/>
+									<listOptionValue builtIn="false" value="../../lwip/src/include/ipv4"/>
+									<listOptionValue builtIn="false" value="../../lwip/src/include/lwip"/>
+									<listOptionValue builtIn="false" value="../../lwip/src/include/netif"/>
+									<listOptionValue builtIn="false" value="../../fatFS/src"/>
+									<listOptionValue builtIn="false" value="../../nanopb-mirror"/>
+									<listOptionValue builtIn="false" value="/opt/ARM/bin/../lib/gcc/arm-none-eabi/4.7.4/include"/>
+									<listOptionValue builtIn="false" value="/opt/ARM/bin/../lib/gcc/arm-none-eabi/4.7.4/include-fixed"/>
+									<listOptionValue builtIn="false" value="/opt/ARM/bin/../lib/gcc/arm-none-eabi/4.7.4/../../../../arm-none-eabi/include"/>
+								</option>
+								<inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.483236765" superClass="cdt.managedbuild.tool.gnu.c.compiler.input"/>
+							</tool>
+							<tool id="cdt.managedbuild.tool.gnu.cross.cpp.compiler.1124698420" name="Cross G++ Compiler" superClass="cdt.managedbuild.tool.gnu.cross.cpp.compiler"/>
+							<tool id="cdt.managedbuild.tool.gnu.cross.c.linker.1492039703" name="Cross GCC Linker" superClass="cdt.managedbuild.tool.gnu.cross.c.linker">
+								<inputType id="cdt.managedbuild.tool.gnu.c.linker.input.676920901" superClass="cdt.managedbuild.tool.gnu.c.linker.input">
+									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
+									<additionalInput kind="additionalinput" paths="$(LIBS)"/>
+								</inputType>
+							</tool>
+							<tool id="cdt.managedbuild.tool.gnu.cross.cpp.linker.505601354" name="Cross G++ Linker" superClass="cdt.managedbuild.tool.gnu.cross.cpp.linker"/>
+							<tool id="cdt.managedbuild.tool.gnu.cross.archiver.1591853377" name="Cross GCC Archiver" superClass="cdt.managedbuild.tool.gnu.cross.archiver"/>
+							<tool id="cdt.managedbuild.tool.gnu.cross.assembler.961949901" name="Cross GCC Assembler" superClass="cdt.managedbuild.tool.gnu.cross.assembler">
+								<inputType id="cdt.managedbuild.tool.gnu.assembler.input.852926207" superClass="cdt.managedbuild.tool.gnu.assembler.input"/>
+							</tool>
+						</toolChain>
+					</folderInfo>
+				</configuration>
+			</storageModule>
+			<storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
+		</cconfiguration>
+	</storageModule>
+	<storageModule moduleId="cdtBuildSystem" version="4.0.0">
+		<project id="printf-stdarg-float.null.1385722557" name="printf-stdarg-float"/>
+	</storageModule>
+	<storageModule moduleId="org.eclipse.cdt.core.LanguageSettingsProviders"/>
+	<storageModule moduleId="refreshScope"/>
+	<storageModule moduleId="scannerConfiguration">
+		<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
+		<scannerConfigBuildInfo instanceId="cdt.managedbuild.toolchain.gnu.cross.base.1619635427;cdt.managedbuild.toolchain.gnu.cross.base.1619635427.1679475204;cdt.managedbuild.tool.gnu.cross.c.compiler.298106961;cdt.managedbuild.tool.gnu.c.compiler.input.483236765">
+			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="org.eclipse.cdt.managedbuilder.core.GCCManagedMakePerProjectProfileC"/>
+		</scannerConfigBuildInfo>
+	</storageModule>
+</cproject>
