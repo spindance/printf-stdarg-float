@@ -419,7 +419,7 @@ out_lbl:
 			++pc;
 		}
    }  //  for each char in format string
-   if (out && (pc == max_output_len)){
+   if (out && (pc >= max_output_len)){
       (*out)--;
       **out = '\0';
    } else if (out) {
