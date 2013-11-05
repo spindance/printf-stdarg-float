@@ -67,7 +67,7 @@
 extern int putchar (int c);
 #endif
 
-#ifdef USE_FLOATING_POINT
+#if USE_FLOATING_POINT
   #define FLOAT_OR_DOUBLE float
 #else
   #define FLOAT_OR_DOUBLE double
@@ -390,12 +390,16 @@ static int print (char **out, unsigned int max_output_len, int *varg)
             if ((caddr & 0xF) != 0) {
                cptr += 4;
             }
-            float *flt_or_dbl_ptr = (float *) cptr;  //lint !e740 !e826  convert to float pointer
+            FLOAT_OR_DOUBLE *flt_or_dbl_ptr = (FLOAT_OR_DOUBLE *) cptr;  //lint !e740 !e826  convert to float pointer
 #else
-            float *flt_or_dbl_ptr = (float *) varg;  //lint !e740 !e826  convert to float pointer
+            if (((int)varg & 0x4) != 0) {
+            	varg++;
+            }
+            double *flt_or_dbl_ptr = (double *)varg;  //lint !e740 !e826  convert to float pointer
+            varg += 2;
 #endif
-            float flt_or_dbl = *flt_or_dbl_ptr++;   //  increment double pointer
-            varg = (int *) flt_or_dbl_ptr;    //lint !e740  copy updated pointer back to base pointer
+            double d = *(double *)flt_or_dbl_ptr;
+            FLOAT_OR_DOUBLE flt_or_dbl = d;
             char bfr[81];
             fltordbl2stri(bfr, flt_or_dbl, dec_width, use_leading_plus);
             pc += prints (out, bfr, width, pad, max_output_len, cur_output_char_p);
@@ -523,6 +527,7 @@ int main (void)
    termf("+ format: int: %+d, %+d, float: %+.1f, %+.1f, reset: %d, %.1f\n", 3, -3, 3.0f, -3.0f, 3, 3.0);
    stringf (buf, "%.3f is a float, %.2f is with two decimal places\n", 3.345f, 3.345f);
    termf ("%s", buf);
+   termf("\n");
 #else // USE_DOUBLES
    termf("+ format: int: %+d, %+d, double: %+.1f, %+.1f, reset: %d, %.1f\n", 3, -3, 3.0, -3.0, 3, 3.0);
    stringf (buf, "%.3f is a double, %.2f is with two decimal places\n", 3.345, 3.345);
