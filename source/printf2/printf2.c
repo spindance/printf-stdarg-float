@@ -32,6 +32,9 @@
 //  10/25/11 - Add support for %+ format (always show + on positive numbers)
 //  05/10/13 - Add stringfn() function, which takes a maximum-output-buffer
 //             length as an argument.  Similar to snprintf()
+//  01/28/14 - Fixed bug where %s strings overflowed buffer with final '\0'.
+//  01/28/14 - Fixed linux i686 gcc double stack alignment bug. 
+//  01/28/14 - Improved testing support. 
 //*******************************************************************************
 //  BUGS
 //  If '%' is included in a format string, in the form \% with the intent
@@ -65,6 +68,9 @@
 #ifdef TEST_PRINTF
 #include <stdio.h>
 extern int putchar (int c);
+#ifdef TEST_EXPECTED_OUTPUT
+#include <assert.h>
+#endif
 #endif
 
 #if USE_FLOATING_POINT
@@ -91,7 +97,7 @@ static void printchar (char **str, int c, unsigned int max_output_len, int *cur_
         ++(*str);
         (*cur_output_char_p)++ ;
     }
-#ifdef TEST_PRINTF
+#if defined TEST_PRINTF && !defined TEST_EMBEDDED
     else {
         (*cur_output_char_p)++ ;
         (void) putchar (c);
@@ -297,6 +303,7 @@ static int print (char **out, unsigned int max_output_len, int *varg)
     int *cur_output_char_p = &cur_output_char;
     int use_leading_plus = 0 ;  //  start out with this clear
 
+    max_output_len--; // make room for a trailing '\0'
     for (; *format != 0; ++format) {
         if (*format == '%') {
             dec_width = 6 ;
@@ -343,6 +350,8 @@ static int print (char **out, unsigned int max_output_len, int *varg)
             }
             if (*format == 'l')
                 ++format;
+            if (*format == 'h')
+                ++format;
             switch (*format) {
             case 's':
             {
@@ -382,24 +391,29 @@ static int print (char **out, unsigned int max_output_len, int *varg)
                 // http://wiki.debian.org/ArmEabiPort#Structpackingandalignment
                 // Stack alignment
                 //
-                // The ARM EABI requires 8-byte stack alignment at public function entry points,
-                // compared to the previous 4-byte alignment.
-#ifdef USE_NEWLIB
-                char *cptr = (char *) varg;  //lint !e740 !e826  convert to double pointer
-                uint caddr = (uint) cptr;
-                if ((caddr & 0xF) != 0) {
-                    cptr += 4;
+                // "One of the key differences between the traditional GNU/Linux 
+                // ABI and the EABI is that 64-bit types (like long long) are 
+                // aligned differently. In the traditional ABI, these types had 
+                // 4-byte alignment; in the EABI they have 8-byte alignment. 
+                // As a result, if you use the same structure definitions 
+                // (in a header file) and include it in code used in both 
+                // the kernel and in application code, you may find that 
+                // the structure size and alignment differ."
+                // 
+#if defined __i686__
+	        // do nothing to adjust stack on 32-bit linux
+#elif defined __ARM_EABI__
+                if ((uint)varg & 0x4) != 0) {
+	            varg++;
                 }
-                FLOAT_OR_DOUBLE *flt_or_dbl_ptr = (FLOAT_OR_DOUBLE *) cptr;  //lint !e740 !e826  convert to float pointer
 #else
-                if (((int)varg & 0x4) != 0) {
+                if (((uint)varg & 0x4) != 0) {
                     varg++;
                 }
-                double *flt_or_dbl_ptr = (double *)varg;  //lint !e740 !e826  convert to float pointer
-                varg += 2;
 #endif
-                double d = *(double *)flt_or_dbl_ptr;
+                double d = *(double *)varg;
                 FLOAT_OR_DOUBLE flt_or_dbl = d;
+                varg += sizeof(double)/sizeof(int);
                 char bfr[81];
                 fltordbl2stri(bfr, flt_or_dbl, dec_width, use_leading_plus);
                 pc += prints (out, bfr, width, pad, max_output_len, cur_output_char_p);
@@ -423,12 +437,8 @@ static int print (char **out, unsigned int max_output_len, int *varg)
             ++pc;
         }
     }  //  for each char in format string
-    if (out && (pc >= max_output_len)){
-        (*out)--;
-        **out = '\0';
-    } else if (out) {
-        **out = '\0';
-    }
+    if (out) //lint !e850
+      **out = '\0';
     return pc;
 }
 
@@ -438,11 +448,25 @@ static int print (char **out, unsigned int max_output_len, int *varg)
 //  have a meaningful stdout device.
 //****************************************************************************
 #ifdef TEST_PRINTF
+#ifdef TEST_EXPECTED_OUTPUT
+#define termf(format, ...) printf( format, ##__VA_ARGS__ )
+#elif defined TEST_EMBEDDED
+int termf (const char *format, ...)
+{
+    const int MAX_LENGTH = 200;
+    char s[MAX_LENGTH];
+    int *varg = (int *) (char *) (&format);
+    int result = stringf (s, format, varg);
+    lstrKnl(s);
+    return result;
+}
+#else
 int termf (const char *format, ...)
 {
     int *varg = (int *) (char *) (&format);
     return print (0, -1, varg);
 }  //lint !e715
+#endif
 #endif
 
 //****************************************************************************
@@ -451,11 +475,33 @@ int termf (const char *format, ...)
 //  have a meaningful stdout device.
 //****************************************************************************
 #ifdef TEST_PRINTF
+#ifdef TEST_EXPECTED_OUTPUT
+#define termfn(max_len, format, ...) \
+  { \
+    const int MAX_LENGTH = 200; \
+    char s[MAX_LENGTH]; \
+    assert(max_len<MAX_LENGTH); \
+    snprintf(s, max_len, format, ##__VA_ARGS__ ); \
+    printf( "%s", s ); \
+  } 
+#elif defined TEST_EMBEDDED
+int termfn (uint max_len, const char *format, ...)
+{
+    const int MAX_LENGTH = 200;
+    char s[MAX_LENGTH];
+    assert(max_len<MAX_LENGTH);
+    int *varg = (int *) (char *) (&format);
+    int result = stringf (s, format, varg);
+    lstrKnl(s);
+    return result;
+}
+#else
 int termfn(uint max_len, const char *format, ...)
 {
     int *varg = (int *) (char *) (&format);
     return print (0, max_len, varg);
 }  //lint !e715
+#endif
 #endif
 
 //****************************************************************************
@@ -494,7 +540,7 @@ int stringfnp(char *out, unsigned int max_len, const char *format, int * argPtr)
 
 //****************************************************************************
 #ifdef TEST_PRINTF
-int main (void)
+int testPrintf (void)
 {
     int slen ;
     char *ptr = "Hello world!";
@@ -523,16 +569,16 @@ int main (void)
     slen += stringf(buf+slen, "right=[%4d]\n", -3) ;
     termf ("[%d] %s", slen, buf);
 
-#ifdef USE_FLOATING_POINT
+    //#ifdef USE_FLOATING_POINT
     termf("+ format: int: %+d, %+d, float: %+.1f, %+.1f, reset: %d, %.1f\n", 3, -3, 3.0f, -3.0f, 3, 3.0);
     stringf (buf, "%.3f is a float, %.2f is with two decimal places\n", 3.345f, 3.345f);
     termf ("%s", buf);
     termf("\n");
-#else // USE_DOUBLES
+    //#else // USE_DOUBLES
     termf("+ format: int: %+d, %+d, double: %+.1f, %+.1f, reset: %d, %.1f\n", 3, -3, 3.0, -3.0, 3, 3.0);
     stringf (buf, "%.3f is a double, %.2f is with two decimal places\n", 3.345, 3.345);
     termf ("%s", buf);
-#endif
+    //#endif
 
     stringf (buf, "multiple unsigneds: %u %u %2u %X\n", 15, 5, 23, 0xB38F) ;
     termf ("%s", buf);
@@ -540,7 +586,7 @@ int main (void)
     stringf (buf, "multiple chars: %c %c %c %c\n", 'a', 'b', 'c', 'd') ;
     termf ("%s", buf);
 
-#ifdef USE_FLOATING_POINT
+    //#ifdef USE_FLOATING_POINT
     termf("\nFloats:\n");
     stringf (buf, "multiple floats: %f %.1f %2.0f %.2f %.3f %.2f [%-8.3f]\n",
             3.45f, 3.93f, 2.45f, -1.1f, 3.093f, 13.72f, -4.382f) ;
@@ -551,7 +597,7 @@ int main (void)
     stringf (buf, "rounding floats: %.1f %.1f %.3f %.2f [%-8.3f]\n",
             3.93f, 3.96f, 3.0988f, 3.999f, -4.382f) ;
     termf ("%s", buf);
-#else // USE_DOUBLES
+    //#else // USE_DOUBLES
     termf("\nDoubles:\n");
     stringf (buf, "multiple doubles: %f %.1f %2.0f %.2f %.3f %.2f [%-8.3f]\n",
             3.45, 3.93, 2.45, -1.1, 3.093, 13.72, -4.382) ;
@@ -562,12 +608,14 @@ int main (void)
     stringf (buf, "rounding doubles: %.1f %.1f %.3f %.2f [%-8.3f]\n",
             3.93, 3.96, 3.0988, 3.999, -4.382) ;
     termf ("%s", buf);
-#endif
+    //#endif
     termf("\n");
 
-    termfn(20, "%s", "no more than 20 bytes of this string should be displayed!");
+    termf (          "|<-             ->|\n");
+    termfn(20, "%s", "no more than 19 bytes of this string should be displayed!");
     termf ("\n");
-    stringfn(buf, 25, "only 25 buffered bytes should be displayed from this string") ;
+    termf (           "|<-                  ->|\n");
+    stringfn(buf, 25, "only 24 buffered bytes should be displayed from this string") ;
     termf ("%s", buf);
     termf ("\n");
 
@@ -579,5 +627,14 @@ int main (void)
 
     return 0;
 }
+
+#ifndef TEST_EMBEDDED
+
+int main(void)
+{
+  return testPrintf();
+}
+#endif
+
 #endif
 

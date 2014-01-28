@@ -1,2 +1,8 @@
 .config
 .config.old
+printf2Expected.exe
+printf2Uut.exe
+expectedOutput.txt
+uutOutput.txt
+uutOutputFloat.txt
+.#*

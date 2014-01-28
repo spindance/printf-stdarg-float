@@ -189,6 +189,35 @@ SEP = '-----------------------------------------------------------------------+-
 all: obj/printf2.a
 	@# This line prevents warning when nothing to be done for all.
 
+# test printf2 output versus Linux gcc stdio snprintf, printf
+.PHONY: runtest
+runtest :
+	@echo $(SEP)
+	@echo "+-- testing printf2 versus Linux gcc stdio snprintf, printf"
+	@echo $(SEP)
+	@echo "+-- gcc ... -DTEST_PRINTF -DTEST_EXPECTED_OUTPUT ... -o printf2Expected.exe"
+	$(Q)gcc -Wall -O2 -DTEST_PRINTF -DTEST_EXPECTED_OUTPUT -s source/printf2/printf2.c -Isource/ -o printf2Expected.exe
+	@echo "+-- gcc ... -DTEST_PRINTF ... -o printf2Uut.exe"
+	$(Q)gcc -Wall -O2 -DTEST_PRINTF -s source/printf2/printf2.c -Isource/ -o printf2Uut.exe
+	@echo "+-- gcc ... -DTEST_PRINTF -DUSE_FLOATING_POINT ... -o printf2UutFloat.exe"
+	$(Q)gcc -Wall -O2 -DTEST_PRINTF -DUSE_FLOATING_POINT -s source/printf2/printf2.c -Isource/ -o printf2UutFloat.exe
+	@echo "+-- ./printf2Expected.exe outputs:"
+	$(Q)./printf2Expected.exe
+	@echo "+-- <end-of-output>"
+	@echo "+-- ./printf2Uut.exe outputs:"
+	$(Q)./printf2Uut.exe
+	@echo "+-- <end-of-output>"
+	@echo "+-- ./printf2UutFloat.exe outputs:"
+	$(Q)./printf2UutFloat.exe
+	@echo "+-- <end-of-output>"
+	@echo "+-- diff printf2Uut.exe output to printf2Expected output:"
+	$(Q)./printf2Expected.exe > expectedOutput.txt
+	$(Q)./printf2Uut.exe > uutOutput.txt
+	$(Q)if diff uutOutput.txt expectedOutput.txt; then echo "+-- Test Passed."; else echo "+-- Test Failed."; fi
+	@echo "+-- diff printf2UutFloat.exe output to printf2Expected output:"
+	$(Q)./printf2UutFloat.exe > uutOutputFloat.txt
+	$(Q)if diff uutOutputFloat.txt expectedOutput.txt; then echo "+-- Test Passed."; else echo "+-- Test Failed."; fi
+
 ifndef MAKECMDGOALS
 -include $(DEPS)
 else
@@ -270,6 +299,12 @@ ifneq ($(strip $(TOP_BUILD_DIR)),)
 	@echo $(SEP)
 	@echo "+--printf-stdarg-float library clean"
 	@echo $(SEP)
+	$(RM) -f printf2Expected.exe
+	$(RM) -f printf2Uut.exe
+	$(RM) -f printf2UutFloat.exe
+	$(RM) -f expectedOutput.txt
+	$(RM) -f uutOutput.txt
+	$(RM) -f uutOutputFloat.txt
 	$(RM) -fr $(TOP_BUILD_DIR)*
 else
 	$(Q)echo "TOP_BUILD_DIR is not defined or empty, can't clean."
@@ -290,6 +325,8 @@ help :
 	$(Q)echo ""
 	$(Q)echo "make repos            - git clone required brother repositories to \"cd ..\""
 	$(Q)echo "make                  - Build the executable software"
+	$(Q)echo ""
+	$(Q)echo "make runtest          - Test printf2 versus Linux gcc stdio snprintf, printf"
 	$(Q)echo ""
 	$(Q)echo "make all              - Build the executable software - same as \"make\""
 	$(Q)echo "make clean            - Clean build products"
