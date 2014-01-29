@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2013 SpinDance Inc.
+# Copyright (c) 2014 SpinDance Inc.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
