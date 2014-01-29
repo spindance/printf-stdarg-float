@@ -19,7 +19,11 @@
 
 int stringf  (char *out, const char *format, ...);
 int stringfn (char *out, unsigned int max_len, const char *format, ...);
-int stringfnp(char *out, unsigned int max_len, const char *format, int * argPtr);
+//tbdrms int stringfnp(char *out, unsigned int max_len, const char *format, int * argPtr);
+int stringfnv(char *out, unsigned int max_len, const char *format, va_list vargs);
 
+#if defined CONFIG_PRINTF2_TEST_PRINTF_ENA || defined TEST_PRINTF
+int testPrintf (void);
+#endif
 
 #endif

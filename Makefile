@@ -128,8 +128,16 @@ export REPO_LIST = $(REPO_LIST-y)
 
 # Where we get pieces from...
 
-INCLUDE_DIRS-y += -Iinclude
-INCLUDE_DIRS-y += -Isource
+
+
+INCLUDE_DIRS-$(CONFIG_APP)                  += -I../$(APP_DIR)/include
+INCLUDE_DIRS-$(CONFIG_APP)                  += -I../$(APP_DIR)/include/generated
+INCLUDE_DIRS-$(CONFIG_APP)                  += -I../$(APP_DIR)/source
+INCLUDE_DIRS-$(CONFIG_QUICKSTART)           += -I../$(QUICKSTART_DIR)/include
+INCLUDE_DIRS-$(CONFIG_QUICKSTART)           += -I../$(QUICKSTART_DIR)/include/generated
+INCLUDE_DIRS-$(CONFIG_QUICKSTART)           += -I../$(QUICKSTART_DIR)/source
+INCLUDE_DIRS-y                              += -Iinclude
+INCLUDE_DIRS-y                              += -Isource
 
 # C Source files
 SOURCE-y                                     := 
@@ -166,8 +174,12 @@ CFLAGS-$(CONFIG_TOOLCHAIN_DEBUG)      += -g
 
 CFLAGS = $(CFLAGS-y)
 
-CPPFLAGS-y                                    += -D ALIGN_STRUCT_END=__attribute\(\(aligned\(4\)\)\)
-CPPFLAGS-y                                    += -D USE_FLOATING_POINT
+CPPFLAGS-y                                          += -D ALIGN_STRUCT_END=__attribute\(\(aligned\(4\)\)\)
+CPPFLAGS-$(CONFIG_PRINTF2_USE_FLOATING_POINT_ENA)   += -D USE_FLOATING_POINT
+CPPFLAGS-$(CONFIG_PRINTF2_TEST_EMBEDDED_ENA)        += -D TEST_EMBEDDED
+CPPFLAGS-$(CONFIG_PRINTF2_TEST_PRINTF_ENA)          += -D TEST_PRINTF
+CPPFLAGS-$(CONFIG_PRINTF2_TEST_EXPECTED_OUTPUT_ENA) += -D TEST_EXPECTED_OUTPUT
+
 CPPFLAGS-y                                    += $(INCLUDE_DIRS-y)
 
 CFLAGS += $(CPPFLAGS-y)
@@ -222,7 +234,7 @@ ifndef MAKECMDGOALS
 -include $(DEPS)
 else
 ifneq ($(MAKECMDGOALS),$(filter $(MAKECMDGOALS),\
-"help repos repostatus \
+"help runtest repos repostatus \
 menuconfig clean distclean config nconfig menuconfig \
 oldconfig silentoldconfig savedefconfig allnoconfig allyesconfig \
 alldefconfig randconfig listnewconfig olddefconfig "))

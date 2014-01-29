@@ -35,6 +35,7 @@
 //  01/28/14 - Fixed bug where %s strings overflowed buffer with final '\0'.
 //  01/28/14 - Fixed linux i686 gcc double stack alignment bug. 
 //  01/28/14 - Improved testing support. 
+//  01/28/14 - Uses stdarg.h - runs optimized with arm-none-eabi-gcc.
 //*******************************************************************************
 //  BUGS
 //  If '%' is included in a format string, in the form \% with the intent
@@ -62,14 +63,24 @@
 
 // #define  TEST_PRINTF    1
 
-#include <string.h>
 #include "printf2/printf2.h"
+
+#include <string.h>
+#include <stdarg.h>
+#include <limits.h>
 
 #ifdef TEST_PRINTF
 #include <stdio.h>
+#ifndef TEST_EMBEDDED
 extern int putchar (int c);
-#ifdef TEST_EXPECTED_OUTPUT
+#endif
+
+#if defined TEST_EXPECTED_OUTPUT || defined TEST_EMBEDDED
 #include <assert.h>
+#endif
+
+#if defined TEST_EMBEDDED
+#include "printf2/printf2Config.h"
 #endif
 #endif
 
@@ -291,13 +302,12 @@ static int printi (char **out, int i, uint base, int sign, int width, int pad, i
 }
 
 //****************************************************************************
-static int print (char **out, unsigned int max_output_len, int *varg)
+static int print (char **out, unsigned int max_output_len, const char *format, va_list vargs)
 {
     int post_decimal ;
     int width, pad ;
     unsigned dec_width = 6 ;
     int pc = 0;
-    char *format = (char *) (*varg++);
     char scr[2];
     int cur_output_char = 0;
     int *cur_output_char_p = &cur_output_char;
@@ -355,32 +365,31 @@ static int print (char **out, unsigned int max_output_len, int *varg)
             switch (*format) {
             case 's':
             {
-                // char *s = *((char **) varg++);   //lint !e740
-                char *s = (char *) *varg++ ;  //lint !e740 !e826
+	        char *s = va_arg(vargs, char*);
                 pc += prints (out, s ? s : "(null)", width, pad, max_output_len, cur_output_char_p);
                 use_leading_plus = 0 ;  //  reset this flag after printing one value
             }
             break;
             case 'd':
-                pc += printi (out, *varg++, 10, 1, width, pad, 'a', max_output_len, cur_output_char_p, use_leading_plus);
+	        pc += printi (out, va_arg(vargs, int), 10, 1, width, pad, 'a', max_output_len, cur_output_char_p, use_leading_plus);
                 use_leading_plus = 0 ;  //  reset this flag after printing one value
                 break;
             case 'x':
-                pc += printi (out, *varg++, 16, 0, width, pad, 'a', max_output_len, cur_output_char_p, use_leading_plus);
+	        pc += printi (out, va_arg(vargs, int), 16, 0, width, pad, 'a', max_output_len, cur_output_char_p, use_leading_plus);
                 use_leading_plus = 0 ;  //  reset this flag after printing one value
                 break;
             case 'X':
-                pc += printi (out, *varg++, 16, 0, width, pad, 'A', max_output_len, cur_output_char_p, use_leading_plus);
+                pc += printi (out, va_arg(vargs, int), 16, 0, width, pad, 'A', max_output_len, cur_output_char_p, use_leading_plus);
                 use_leading_plus = 0 ;  //  reset this flag after printing one value
                 break;
             case 'p':
             case 'u':
-                pc += printi (out, *varg++, 10, 0, width, pad, 'a', max_output_len, cur_output_char_p, use_leading_plus);
+                pc += printi (out, va_arg(vargs, int), 10, 0, width, pad, 'a', max_output_len, cur_output_char_p, use_leading_plus);
                 use_leading_plus = 0 ;  //  reset this flag after printing one value
                 break;
             case 'c':
                 /* char are converted to int then pushed on the stack */
-                scr[0] = (char) *varg++;
+	        scr[0] = (char)va_arg(vargs,int);
                 scr[1] = '\0';
                 pc += prints (out, scr, width, pad, max_output_len, cur_output_char_p);
                 use_leading_plus = 0 ;  //  reset this flag after printing one value
@@ -388,32 +397,8 @@ static int print (char **out, unsigned int max_output_len, int *varg)
 
             case 'f':
             {
-                // http://wiki.debian.org/ArmEabiPort#Structpackingandalignment
-                // Stack alignment
-                //
-                // "One of the key differences between the traditional GNU/Linux 
-                // ABI and the EABI is that 64-bit types (like long long) are 
-                // aligned differently. In the traditional ABI, these types had 
-                // 4-byte alignment; in the EABI they have 8-byte alignment. 
-                // As a result, if you use the same structure definitions 
-                // (in a header file) and include it in code used in both 
-                // the kernel and in application code, you may find that 
-                // the structure size and alignment differ."
-                // 
-#if defined __i686__
-	        // do nothing to adjust stack on 32-bit linux
-#elif defined __ARM_EABI__
-                if ((uint)varg & 0x4) != 0) {
-	            varg++;
-                }
-#else
-                if (((uint)varg & 0x4) != 0) {
-                    varg++;
-                }
-#endif
-                double d = *(double *)varg;
+	        double d = va_arg(vargs,double);
                 FLOAT_OR_DOUBLE flt_or_dbl = d;
-                varg += sizeof(double)/sizeof(int);
                 char bfr[81];
                 fltordbl2stri(bfr, flt_or_dbl, dec_width, use_leading_plus);
                 pc += prints (out, bfr, width, pad, max_output_len, cur_output_char_p);
@@ -455,16 +440,21 @@ int termf (const char *format, ...)
 {
     const int MAX_LENGTH = 200;
     char s[MAX_LENGTH];
-    int *varg = (int *) (char *) (&format);
-    int result = stringf (s, format, varg);
-    lstrKnl(s);
+    va_list vargs;
+    va_start(vargs,format);
+    int result = stringfnv (s, MAX_LENGTH, format, vargs);
+    va_end(vargs);
+    LOG_STRING(s);
     return result;
 }
 #else
 int termf (const char *format, ...)
 {
-    int *varg = (int *) (char *) (&format);
-    return print (0, -1, varg);
+    va_list vargs;
+    va_start(vargs,format);
+    int result = print (0, UINT_MAX, format, vargs);
+    va_end(vargs);
+    return result;
 }  //lint !e715
 #endif
 #endif
@@ -490,16 +480,21 @@ int termfn (uint max_len, const char *format, ...)
     const int MAX_LENGTH = 200;
     char s[MAX_LENGTH];
     assert(max_len<MAX_LENGTH);
-    int *varg = (int *) (char *) (&format);
-    int result = stringf (s, format, varg);
-    lstrKnl(s);
+    va_list vargs;
+    va_start(vargs,format);
+    int result = stringfnv (s, max_len, format, vargs);
+    va_end(vargs);
+    LOG_STRING(s);
     return result;
 }
 #else
 int termfn(uint max_len, const char *format, ...)
 {
-    int *varg = (int *) (char *) (&format);
-    return print (0, max_len, varg);
+    va_list vargs;
+    va_start(vargs,format);
+    int result = print (0, max_len, format, vargs);
+    va_end(vargs);
+    return result;
 }  //lint !e715
 #endif
 #endif
@@ -507,13 +502,11 @@ int termfn(uint max_len, const char *format, ...)
 //****************************************************************************
 int stringf (char *out, const char *format, ...)
 {
-    //  create a pointer into the stack.
-    //  Thematically this should be a void*, since the actual usage of the
-    //  pointer will vary.  However, int* works fine too.
-    //  Either way, the called function will need to re-cast the pointer
-    //  for any type which isn't sizeof(int)
-    int *varg = (int *) (char *) (&format);
-    return print (&out, -1, varg);
+    va_list vargs;
+    va_start(vargs,format);
+    int result = print (&out, UINT_MAX, format, vargs);
+    va_end(vargs);
+    return result;
 }
 
 //****************************************************************************
@@ -522,21 +515,19 @@ int stringf (char *out, const char *format, ...)
 //lint -esym(765, stringfn)
 int stringfn(char *out, unsigned int max_len, const char *format, ...)
 {
-    //  create a pointer into the stack.
-    //  Thematically this should be a void*, since the actual usage of the
-    //  pointer will vary.  However, int* works fine too.
-    //  Either way, the called function will need to re-cast the pointer
-    //  for any type which isn't sizeof(int)
-    int *varg = (int *) (char *) (&format);
-    return print (&out, max_len, varg);
+    va_list vargs;
+    va_start(vargs,format);
+    int result = print (&out, max_len, format, vargs);
+    va_end(vargs);
+    return result;
 }
 
 //****************************************************************************
-int stringfnp(char *out, unsigned int max_len, const char *format, int * argPtr)
-{
-    return print (&out, max_len, argPtr);
-}
 
+int stringfnv(char *out, unsigned int max_len, const char *format, va_list vargs)
+{
+  return print (&out, max_len, format, vargs);
+}
 
 //****************************************************************************
 #ifdef TEST_PRINTF
