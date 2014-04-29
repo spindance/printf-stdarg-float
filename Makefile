@@ -45,7 +45,6 @@
 #
 unquote = $(subst $\",,$1)
 
-
 ifeq ($(CONFIG_CONFIGURED),y)
     ifeq ($(CONFIG_QUIET_BUILD),y)
         export Q ?= @
@@ -106,12 +105,17 @@ PROJECT_DIR=$(notdir $(CURDIR))
 # Convention for where the build detritus ends up
 #
 # We build a tree of object files (.o) and dependancy files 
-# in $(TOP_BUILD_DIR).
+# in $(OBJ_DIR).
 #
 # The tree matches the structure of the source tree.
 #
 TOP_BUILD_DIR   = obj/
-BUILD_DIR	= $(TOP_BUILD_DIR)$(PROJECT_DIR)/
+
+ifeq ($(OBJ_DIR),)
+OBJ_DIR=$(TOP_BUILD_DIR)
+endif
+
+BUILD_DIR	= $(OBJ_DIR)$(PROJECT_DIR)/
 
 include makedefs
 
@@ -198,7 +202,7 @@ SEP = '-----------------------------------------------------------------------+-
 
 .PHONY: all
 
-all: obj/printf2.a
+all: $(OBJ_DIR)printf2.a
 	@# This line prevents warning when nothing to be done for all.
 
 # test printf2 output versus Linux gcc stdio snprintf, printf
@@ -257,7 +261,7 @@ alldefconfig randconfig listnewconfig olddefconfig "))
 endif
 endif
 
-obj/printf2.a: $(OBJS)
+$(OBJ_DIR)printf2.a: $(OBJS)
 	@echo "+--$(AR) $@"
 	$(Q)$(AR) -rc $@ $^
 
@@ -307,7 +311,7 @@ doxygen :
 
 .PHONY: clean
 clean :
-ifneq ($(strip $(TOP_BUILD_DIR)),)
+ifneq ($(strip $(OBJ_DIR)),)
 	@echo $(SEP)
 	@echo "+--printf-stdarg-float library clean"
 	@echo $(SEP)
@@ -317,9 +321,9 @@ ifneq ($(strip $(TOP_BUILD_DIR)),)
 	$(RM) -f expectedOutput.txt
 	$(RM) -f uutOutput.txt
 	$(RM) -f uutOutputFloat.txt
-	$(RM) -fr $(TOP_BUILD_DIR)*
+	$(RM) -fr $(OBJ_DIR)*
 else
-	$(Q)echo "TOP_BUILD_DIR is not defined or empty, can't clean."
+	$(Q)echo "OBJ_DIR is not defined or empty, can't clean."
 endif
 
 .PHONY: distclean
