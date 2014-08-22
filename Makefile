@@ -140,8 +140,10 @@ INCLUDE_DIRS-$(CONFIG_APP)                  += -I../$(APP_DIR)/source
 INCLUDE_DIRS-$(CONFIG_QUICKSTART)           += -I../$(QUICKSTART_DIR)/include
 INCLUDE_DIRS-$(CONFIG_QUICKSTART)           += -I../$(QUICKSTART_DIR)/include/generated
 INCLUDE_DIRS-$(CONFIG_QUICKSTART)           += -I../$(QUICKSTART_DIR)/source
+INCLUDE_DIRS-y                              += -I../nanopb-mirror
 INCLUDE_DIRS-y                              += -Iinclude
 INCLUDE_DIRS-y                              += -Isource
+
 
 # C Source files
 SOURCE-y                                     := 
@@ -179,10 +181,12 @@ CFLAGS-$(CONFIG_TOOLCHAIN_DEBUG)      += -g
 CFLAGS = $(CFLAGS-y)
 
 CPPFLAGS-y                                          += -D ALIGN_STRUCT_END=__attribute\(\(aligned\(4\)\)\)
+CPPFLAGS-y                                          += -D INCLUDE_AUTOCONF
 CPPFLAGS-$(CONFIG_PRINTF2_USE_FLOATING_POINT_ENA)   += -D USE_FLOATING_POINT
 CPPFLAGS-$(CONFIG_PRINTF2_TEST_EMBEDDED_ENA)        += -D TEST_EMBEDDED
 CPPFLAGS-$(CONFIG_PRINTF2_TEST_PRINTF_ENA)          += -D TEST_PRINTF
 CPPFLAGS-$(CONFIG_PRINTF2_TEST_EXPECTED_OUTPUT_ENA) += -D TEST_EXPECTED_OUTPUT
+CPPFLAGS-$(CONFIG_PRINTF2_NANOPB_OSTREAM_ENA)       += -D NANOPB_OSTREAM_ENA=1
 
 CPPFLAGS-y                                    += $(INCLUDE_DIRS-y)
 
@@ -212,11 +216,11 @@ runtest :
 	@echo "+-- testing printf2 versus Linux gcc stdio snprintf, printf"
 	@echo $(SEP)
 	@echo "+-- gcc ... -DTEST_PRINTF -DTEST_EXPECTED_OUTPUT ... -o printf2Expected.exe"
-	$(Q)gcc -Wall -O2 -DTEST_PRINTF -DTEST_EXPECTED_OUTPUT -s source/printf2/printf2.c -Isource/ -o printf2Expected.exe
+	$(Q)gcc -Wall -O2 -DTEST_PRINTF -DTEST_EXPECTED_OUTPUT -s source/printf2/printf2.c -Isource/ -I../nanopb-mirror -o printf2Expected.exe
 	@echo "+-- gcc ... -DTEST_PRINTF ... -o printf2Uut.exe"
-	$(Q)gcc -Wall -O2 -DTEST_PRINTF -s source/printf2/printf2.c -Isource/ -o printf2Uut.exe
+	$(Q)gcc -Wall -O2 -DTEST_PRINTF -s source/printf2/printf2.c -Isource/ -I../nanopb-mirror -o printf2Uut.exe
 	@echo "+-- gcc ... -DTEST_PRINTF -DUSE_FLOATING_POINT ... -o printf2UutFloat.exe"
-	$(Q)gcc -Wall -O2 -DTEST_PRINTF -DUSE_FLOATING_POINT -s source/printf2/printf2.c -Isource/ -o printf2UutFloat.exe
+	$(Q)gcc -Wall -O2 -DTEST_PRINTF -DUSE_FLOATING_POINT -s source/printf2/printf2.c -Isource/ -I../nanopb-mirror -o printf2UutFloat.exe
 	@echo "+-- ./printf2Expected.exe outputs:"
 	$(Q)./printf2Expected.exe
 	@echo "+-- <end-of-output>"

@@ -32,10 +32,6 @@
 //  10/25/11 - Add support for %+ format (always show + on positive numbers)
 //  05/10/13 - Add stringfn() function, which takes a maximum-output-buffer
 //             length as an argument.  Similar to snprintf()
-//  01/28/14 - Fixed bug where %s strings overflowed buffer with final '\0'.
-//  01/28/14 - Fixed linux i686 gcc double stack alignment bug. 
-//  01/28/14 - Improved testing support. 
-//  01/28/14 - Uses stdarg.h - runs optimized with arm-none-eabi-gcc.
 //*******************************************************************************
 //  BUGS
 //  If '%' is included in a format string, in the form \% with the intent
@@ -50,12 +46,17 @@
 //*******************************************************************************
 //*******************************************************************************
 //  Updated by SpinDance Inc.  Changes to the original Menie code are
-//  Copyright 2013 SpinDance Inc.
+//  Copyright 2013-2014 SpinDance Inc.
 //  All such changes are distributed under the same license as the original,
 //  as described above.
 //  09/07/13 - Removed references to USE_INTERNALS.
 //  09/07/13 - Use a standard strlen.
 //  09/18/13 - Added stringfnp().
+//  01/28/14 - Fixed bug where %s strings overflowed buffer with final '\0'.
+//  01/28/14 - Fixed linux i686 gcc double stack alignment bug.
+//  01/28/14 - Improved testing support.
+//  01/28/14 - Uses stdarg.h - runs optimized with arm-none-eabi-gcc.
+//  08/17/14 - Add support for nanopb streams.
 //*******************************************************************************
 
 //lint -esym(752, debug_output)
@@ -90,6 +91,12 @@ extern int putchar (int c);
 #define FLOAT_OR_DOUBLE double
 #endif
 
+#if defined TEST_PRINTF && !defined TEST_EMBEDDED
+#define TEST_NON_EMBEDDED 1
+#else
+#define TEST_NON_EMBEDDED 0
+#endif
+
 //lint -e534  Ignoring return value of function 
 //lint -e539  Did not expect positive indentation from line ...
 //lint -e525  Negative indentation from line ...
@@ -98,22 +105,46 @@ typedef  unsigned char  u8 ;
 typedef  unsigned int   uint ;
 
 
+
 //****************************************************************************
-static void printchar (char **str, int c, unsigned int max_output_len, int *cur_output_char_p)
+static int printchar (
+    #if USE_OSTREAM
+        pb_ostream_t *stream,
+    #else
+        char **str,
+    #endif
+    int c,
+    unsigned int max_output_len,
+    int *cur_output_char_p)
 {
     if (max_output_len >= 0  &&  *cur_output_char_p >= max_output_len)
-        return ;
+        return PRINTF2_OK;
+
+    #if USE_OSTREAM
+    if (stream) {
+        unsigned char charToWrite = c;
+        bool success = pb_write(stream, &charToWrite, 1);
+        if (!success)
+            return PRINTF2_WRITE_ERR;
+        (*cur_output_char_p)++ ;
+    }
+    #else
     if (str) {
         **str = (char) c;
         ++(*str);
         (*cur_output_char_p)++ ;
     }
-#if defined TEST_PRINTF && !defined TEST_EMBEDDED
-    else {
+    #endif
+
+#if TEST_NON_EMBEDDED
+    else if (TEST_NON_EMBEDDED) {
         (*cur_output_char_p)++ ;
         (void) putchar (c);
     }
 #endif
+    else return PRINTF2_NULL_PTR;
+
+    return PRINTF2_OK;
 }
 
 //****************************************************************************
@@ -223,7 +254,14 @@ static unsigned fltordbl2stri(char *outbfr, FLOAT_OR_DOUBLE flt_or_dbl, unsigned
 #define  PAD_RIGHT   1
 #define  PAD_ZERO    2
 
-static int prints (char **out, const char *string, int width, int pad, unsigned int max_output_len, int *cur_output_char_p)
+static int prints (
+                     #if USE_OSTREAM
+                         pb_ostream_t *stream,
+                     #else
+                         char **out,
+                     #endif
+                     const char *string, int width, int pad,
+                     unsigned int max_output_len, int *cur_output_char_p)
 {
     register int pc = 0, padchar = ' ';
     if (width > 0) {
@@ -240,16 +278,37 @@ static int prints (char **out, const char *string, int width, int pad, unsigned 
     }
     if (!(pad & PAD_RIGHT)) {
         for (; width > 0; --width) {
-            printchar (out, padchar, max_output_len, cur_output_char_p);
+            int result = printchar (
+                       #if USE_OSTREAM
+                           stream,
+                       #else
+                           out,
+                       #endif
+                       padchar, max_output_len, cur_output_char_p);
+            if (result <0) return result;
             ++pc;
         }
     }
     for (; *string; ++string) {
-        printchar (out, *string, max_output_len, cur_output_char_p);
+        int result = printchar (
+                   #if USE_OSTREAM
+                       stream,
+                   #else
+                       out,
+                   #endif
+                   *string, max_output_len, cur_output_char_p);
+        if (result < 0) return result;
         ++pc;
     }
     for (; width > 0; --width) {
-        printchar (out, padchar, max_output_len,cur_output_char_p);
+        int result = printchar (
+                   #if USE_OSTREAM
+                       stream,
+                   #else
+                       out,
+                   #endif
+                   padchar, max_output_len,cur_output_char_p);
+        if (result < 0) return result;
         ++pc;
     }
     return pc;
@@ -258,7 +317,15 @@ static int prints (char **out, const char *string, int width, int pad, unsigned 
 //****************************************************************************
 /* the following should be enough for 32 bit int */
 #define PRINT_BUF_LEN 12
-static int printi (char **out, int i, uint base, int sign, int width, int pad, int letbase, unsigned int max_output_len, int *cur_output_char_p, int use_leading_plus)
+static int printi (
+                     #if USE_OSTREAM
+                         pb_ostream_t *stream,
+                     #else
+                         char **out,
+                     #endif
+                     int i, uint base, int sign, int width, int pad,
+                     int letbase, unsigned int max_output_len,
+                     int *cur_output_char_p, int use_leading_plus)
 {
     char print_buf[PRINT_BUF_LEN];
     char *s;
@@ -267,7 +334,13 @@ static int printi (char **out, int i, uint base, int sign, int width, int pad, i
     if (i == 0) {
         print_buf[0] = '0';
         print_buf[1] = '\0';
-        return prints (out, print_buf, width, pad, max_output_len, cur_output_char_p);
+        return prints (
+                        #if USE_OSTREAM
+                            stream,
+                        #else
+                            out,
+                        #endif
+                        print_buf, width, pad, max_output_len, cur_output_char_p);
     }
     if (sign && base == 10 && i < 0) {
         neg = 1;
@@ -286,7 +359,14 @@ static int printi (char **out, int i, uint base, int sign, int width, int pad, i
     }
     if (neg) {
         if (width && (pad & PAD_ZERO)) {
-            printchar (out, '-', max_output_len, cur_output_char_p);
+            int result = printchar (
+                       #if USE_OSTREAM
+                           stream,
+                       #else
+                           out,
+                       #endif
+                       '-', max_output_len, cur_output_char_p);
+            if (result < 0) return result;
             ++pc;
             --width;
         }
@@ -298,11 +378,31 @@ static int printi (char **out, int i, uint base, int sign, int width, int pad, i
             *--s = '+';
         }
     }
-    return pc + prints (out, s, width, pad, max_output_len, cur_output_char_p);
+    int result = prints (
+                         #if USE_OSTREAM
+                             stream,
+                         #else
+                             out,
+                         #endif
+                         s, width, pad, max_output_len, cur_output_char_p);
+    if (result <0) {
+        return result;
+    } else {
+        return pc + result;
+    }
 }
 
 //****************************************************************************
-static int print (char **out, unsigned int max_output_len, const char *format, va_list vargs)
+static int print (
+    #if USE_OSTREAM
+        pb_ostream_t *stream,
+    #else
+        char **out,
+    #endif
+    unsigned int flags,
+    unsigned int max_output_len,
+    const char *format,
+    va_list vargs)
 {
     int post_decimal ;
     int width, pad ;
@@ -365,65 +465,168 @@ static int print (char **out, unsigned int max_output_len, const char *format, v
             switch (*format) {
             case 's':
             {
-	        char *s = va_arg(vargs, char*);
-                pc += prints (out, s ? s : "(null)", width, pad, max_output_len, cur_output_char_p);
+                char *s = va_arg(vargs, char*);
+                int result = prints (
+                    #if USE_OSTREAM
+                        stream,
+                    #else
+                        out,
+                    #endif
+                    s ? s : "(null)", width, pad, max_output_len, cur_output_char_p);
+                if (result<0) return result;
+                pc += result;
                 use_leading_plus = 0 ;  //  reset this flag after printing one value
             }
             break;
             case 'd':
-	        pc += printi (out, va_arg(vargs, int), 10, 1, width, pad, 'a', max_output_len, cur_output_char_p, use_leading_plus);
+            {
+                int result = printi (
+                        #if USE_OSTREAM
+                            stream,
+                        #else
+                            out,
+                        #endif
+                        va_arg(vargs, int), 10, 1, width, pad, 'a', max_output_len, cur_output_char_p, use_leading_plus);
+                if (result<0) return result;
+                pc += result;
+
                 use_leading_plus = 0 ;  //  reset this flag after printing one value
-                break;
+            }
+            break;
             case 'x':
-	        pc += printi (out, va_arg(vargs, int), 16, 0, width, pad, 'a', max_output_len, cur_output_char_p, use_leading_plus);
+            {
+                int result = printi (
+                        #if USE_OSTREAM
+                            stream,
+                        #else
+                            out,
+                        #endif
+                        va_arg(vargs, int), 16, 0, width, pad, 'a', max_output_len, cur_output_char_p, use_leading_plus);
+                if (result<0) return result;
+                pc += result;
                 use_leading_plus = 0 ;  //  reset this flag after printing one value
-                break;
+            }
+            break;
             case 'X':
-                pc += printi (out, va_arg(vargs, int), 16, 0, width, pad, 'A', max_output_len, cur_output_char_p, use_leading_plus);
+            {
+                int result = printi (
+                        #if USE_OSTREAM
+                            stream,
+                        #else
+                            out,
+                        #endif
+                        va_arg(vargs, int), 16, 0, width, pad, 'A', max_output_len, cur_output_char_p, use_leading_plus);
+                if (result<0) return result;
+                pc += result;
                 use_leading_plus = 0 ;  //  reset this flag after printing one value
-                break;
+            }
+            break;
             case 'p':
             case 'u':
-                pc += printi (out, va_arg(vargs, int), 10, 0, width, pad, 'a', max_output_len, cur_output_char_p, use_leading_plus);
-                use_leading_plus = 0 ;  //  reset this flag after printing one value
-                break;
-            case 'c':
-                /* char are converted to int then pushed on the stack */
-	        scr[0] = (char)va_arg(vargs,int);
-                scr[1] = '\0';
-                pc += prints (out, scr, width, pad, max_output_len, cur_output_char_p);
-                use_leading_plus = 0 ;  //  reset this flag after printing one value
-                break;
-
-            case 'f':
             {
-	        double d = va_arg(vargs,double);
-                FLOAT_OR_DOUBLE flt_or_dbl = d;
-                char bfr[81];
-                fltordbl2stri(bfr, flt_or_dbl, dec_width, use_leading_plus);
-                pc += prints (out, bfr, width, pad, max_output_len, cur_output_char_p);
+                int result = printi (
+                              #if USE_OSTREAM
+                                  stream,
+                              #else
+                                  out,
+                              #endif
+                              va_arg(vargs, int), 10, 0, width, pad, 'a', max_output_len, cur_output_char_p, use_leading_plus);
+                use_leading_plus = 0 ;  //  reset this flag after printing one value
+                if (result<0) return result;
+                pc += result;
+            }
+            break;
+            case 'c':
+            {
+                /* char are converted to int then pushed on the stack */
+                scr[0] = (char)va_arg(vargs,int);
+                scr[1] = '\0';
+                int result = prints (
+                              #if USE_OSTREAM
+                                  stream,
+                              #else
+                                  out,
+                              #endif
+                              scr, width, pad, max_output_len, cur_output_char_p);
+                if (result<0) return result;
+                pc += result;
                 use_leading_plus = 0 ;  //  reset this flag after printing one value
             }
             break;
 
-            default:
-                printchar (out, '%', max_output_len, cur_output_char_p);
-                printchar (out, *format, max_output_len, cur_output_char_p);
+            case 'f':
+            {
+                double d = va_arg(vargs,double);
+                FLOAT_OR_DOUBLE flt_or_dbl = d;
+                char bfr[81];
+                fltordbl2stri(bfr, flt_or_dbl, dec_width, use_leading_plus);
+                int result = prints (
+                              #if USE_OSTREAM
+                                  stream,
+                              #else
+                                  out,
+                              #endif
+                              bfr, width, pad, max_output_len, cur_output_char_p);
+                if (result<0) return result;
+                pc += result;
                 use_leading_plus = 0 ;  //  reset this flag after printing one value
+            }
+            break;
+
+            default: {
+                int result = printchar (
+                           #if USE_OSTREAM
+                               stream,
+                           #else
+                               out,
+                           #endif
+                           '%', max_output_len, cur_output_char_p);
+                if (result<0) return result;
+                ++pc;
+
+                result = printchar (
+                           #if USE_OSTREAM
+                               stream,
+                           #else
+                               out,
+                           #endif
+                           *format, max_output_len, cur_output_char_p);
+                if (result<0) return result;
+                ++pc;
+
+                use_leading_plus = 0 ;  //  reset this flag after printing one value
+            }
                 break;
             }
-        } else
-            // if (*format == '\\') {
-            //
-            // } else
-        {
-            out_lbl:
-            printchar (out, *format, max_output_len, cur_output_char_p);
-            ++pc;
+        } else {
+            out_lbl: {
+                int result = printchar (
+                           #if USE_OSTREAM
+                               stream,
+                           #else
+                               out,
+                           #endif
+                           *format, max_output_len, cur_output_char_p);
+                if (result<0) return result;
+                ++pc;
+            }
         }
     }  //  for each char in format string
-    if (out) //lint !e850
-      **out = '\0';
+
+    max_output_len++; // make room for a trailing '\0'
+
+    if (!(flags & PRINTF2_FLAGS_NO_TRAILING_NULL)) {
+        #if USE_OSTREAM
+            int result = printchar (stream, '\0', max_output_len, cur_output_char_p);
+            if (result<0) return result;
+        #else
+            if (out) //lint !e850
+                **out = '\0';
+            else
+                return PRINTF2_NULL_PTR;
+        #endif
+    }
+
     return pc;
 }
 
@@ -452,7 +655,7 @@ int termf (const char *format, ...)
 {
     va_list vargs;
     va_start(vargs,format);
-    int result = print (0, UINT_MAX, format, vargs);
+    int result = print (0, PRINTF2_FLAGS_NONE, UINT_MAX, format, vargs);
     va_end(vargs);
     return result;
 }  //lint !e715
@@ -492,7 +695,7 @@ int termfn(uint max_len, const char *format, ...)
 {
     va_list vargs;
     va_start(vargs,format);
-    int result = print (0, max_len, format, vargs);
+    int result = print (0, PRINTF2_FLAGS_NONE, max_len, format, vargs);
     va_end(vargs);
     return result;
 }  //lint !e715
@@ -500,14 +703,99 @@ int termfn(uint max_len, const char *format, ...)
 #endif
 
 //****************************************************************************
-int stringf (char *out, const char *format, ...)
+int stringff (char *out, unsigned int flags, const char *format, ...)
 {
+    #if USE_OSTREAM
+        pb_ostream_t oStream = pb_ostream_from_buffer((uint8_t *)out, UINT_MAX);
+    #endif
+
     va_list vargs;
     va_start(vargs,format);
-    int result = print (&out, UINT_MAX, format, vargs);
+    int result = print (
+                        #if USE_OSTREAM
+                            &oStream,
+                        #else
+                            &out,
+                        #endif
+                        flags,
+                        UINT_MAX, format, vargs);
     va_end(vargs);
     return result;
 }
+
+
+//****************************************************************************
+int stringf (char *out, const char *format, ...)
+{
+    #if USE_OSTREAM
+        pb_ostream_t oStream = pb_ostream_from_buffer((uint8_t *)out, UINT_MAX);
+    #endif
+
+    va_list vargs;
+    va_start(vargs,format);
+    int result = print (
+                        #if USE_OSTREAM
+                            &oStream,
+                        #else
+                            &out,
+                        #endif
+                        PRINTF2_FLAGS_NONE,
+                        UINT_MAX, format, vargs);
+    va_end(vargs);
+    return result;
+}
+
+
+#if USE_OSTREAM
+//****************************************************************************
+int stringffs (pb_ostream_t *stream, unsigned int flags, const char *format, ...)
+{
+    va_list vargs;
+    va_start(vargs,format);
+    int result = print (
+                        stream,
+                        flags,
+                        stream->max_size, format, vargs);
+    va_end(vargs);
+    return result;
+}
+
+//****************************************************************************
+int stringfs (pb_ostream_t *stream, const char *format, ...)
+{
+    va_list vargs;
+    va_start(vargs,format);
+    int result = print (
+                        stream,
+                        PRINTF2_FLAGS_NONE,
+                        stream->max_size, format, vargs);
+    va_end(vargs);
+    return result;
+}
+#endif
+
+
+//****************************************************************************
+int stringffn(char *out,  unsigned int flags, unsigned int max_len, const char *format, ...)
+{
+    #if USE_OSTREAM
+        pb_ostream_t oStream = pb_ostream_from_buffer((uint8_t *)out, max_len);
+    #endif
+
+    va_list vargs;
+    va_start(vargs,format);
+    int result = print (
+                        #if USE_OSTREAM
+                            &oStream,
+                        #else
+                            &out,
+                        #endif
+                        flags,
+                        max_len, format, vargs);
+    va_end(vargs);
+    return result;
+}
+
 
 //****************************************************************************
 //lint -esym(714, stringfn)
@@ -515,19 +803,96 @@ int stringf (char *out, const char *format, ...)
 //lint -esym(765, stringfn)
 int stringfn(char *out, unsigned int max_len, const char *format, ...)
 {
+    #if USE_OSTREAM
+        pb_ostream_t oStream = pb_ostream_from_buffer((uint8_t *)out, max_len);
+    #endif
+
     va_list vargs;
     va_start(vargs,format);
-    int result = print (&out, max_len, format, vargs);
+    int result = print (
+                        #if USE_OSTREAM
+                            &oStream,
+                        #else
+                            &out,
+                        #endif
+                        PRINTF2_FLAGS_NONE,
+                        max_len, format, vargs);
+    va_end(vargs);
+    return result;
+}
+
+#if USE_OSTREAM
+//****************************************************************************
+int stringffns(pb_ostream_t *stream, unsigned int flags, unsigned int max_len, const char *format, ...)
+{
+    va_list vargs;
+    va_start(vargs,format);
+    int result = print (
+                        stream,
+                        flags,
+                        max_len, format, vargs);
     va_end(vargs);
     return result;
 }
 
 //****************************************************************************
+int stringfns(pb_ostream_t *stream, unsigned int max_len, const char *format, ...)
+{
+    va_list vargs;
+    va_start(vargs,format);
+    int result = print (
+                        stream,
+                        PRINTF2_FLAGS_NONE,
+                        max_len, format, vargs);
+    va_end(vargs);
+    return result;
+}
+#endif
 
+//****************************************************************************
+int stringffnv(char *out, unsigned int flags, unsigned int max_len, const char *format, va_list vargs)
+{
+    #if USE_OSTREAM
+        pb_ostream_t oStream = pb_ostream_from_buffer((uint8_t *)out, max_len);
+    #endif
+
+    return print (
+                   #if USE_OSTREAM
+                       &oStream,
+                   #else
+                       &out,
+                   #endif
+                   flags,
+                   max_len, format, vargs);
+}
+
+//****************************************************************************
 int stringfnv(char *out, unsigned int max_len, const char *format, va_list vargs)
 {
-  return print (&out, max_len, format, vargs);
+    return stringffnv(out, PRINTF2_FLAGS_NONE, max_len, format, vargs);
 }
+
+
+#if USE_OSTREAM
+//****************************************************************************
+int stringffnvs(pb_ostream_t *stream, unsigned int flags, unsigned int max_len, const char *format, va_list vargs)
+{
+    return print (
+                   stream,
+                   flags,
+                   max_len, format, vargs);
+}
+
+//****************************************************************************
+int stringfnvs(pb_ostream_t *stream, unsigned int max_len, const char *format, va_list vargs)
+{
+    return print (
+                   stream,
+                   PRINTF2_FLAGS_NONE,
+                   max_len, format, vargs);
+}
+#endif
+
 
 //****************************************************************************
 #ifdef TEST_PRINTF
