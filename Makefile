@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2013 SpinDance Inc.
+# Copyright (c) 2014 SpinDance Inc.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -44,7 +44,6 @@
 # Define a function to strip quotes from variables defined in .config
 #
 unquote = $(subst $\",,$1)
-
 
 ifeq ($(CONFIG_CONFIGURED),y)
     ifeq ($(CONFIG_QUIET_BUILD),y)
@@ -106,12 +105,17 @@ PROJECT_DIR=$(notdir $(CURDIR))
 # Convention for where the build detritus ends up
 #
 # We build a tree of object files (.o) and dependancy files 
-# in $(TOP_BUILD_DIR).
+# in $(OBJ_DIR).
 #
 # The tree matches the structure of the source tree.
 #
 TOP_BUILD_DIR   = obj/
-BUILD_DIR	= $(TOP_BUILD_DIR)$(PROJECT_DIR)/
+
+ifeq ($(OBJ_DIR),)
+OBJ_DIR=$(TOP_BUILD_DIR)
+endif
+
+BUILD_DIR	= $(OBJ_DIR)$(PROJECT_DIR)/
 
 include makedefs
 
@@ -128,8 +132,18 @@ export REPO_LIST = $(REPO_LIST-y)
 
 # Where we get pieces from...
 
-INCLUDE_DIRS-y += -Iinclude
-INCLUDE_DIRS-y += -Isource
+
+
+INCLUDE_DIRS-$(CONFIG_APP)                  += -I../$(APP_DIR)/include
+INCLUDE_DIRS-$(CONFIG_APP)                  += -I../$(APP_DIR)/include/generated
+INCLUDE_DIRS-$(CONFIG_APP)                  += -I../$(APP_DIR)/source
+INCLUDE_DIRS-$(CONFIG_QUICKSTART)           += -I../$(QUICKSTART_DIR)/include
+INCLUDE_DIRS-$(CONFIG_QUICKSTART)           += -I../$(QUICKSTART_DIR)/include/generated
+INCLUDE_DIRS-$(CONFIG_QUICKSTART)           += -I../$(QUICKSTART_DIR)/source
+INCLUDE_DIRS-y                              += -I../nanopb-mirror
+INCLUDE_DIRS-y                              += -Iinclude
+INCLUDE_DIRS-y                              += -Isource
+
 
 # C Source files
 SOURCE-y                                     := 
@@ -166,8 +180,14 @@ CFLAGS-$(CONFIG_TOOLCHAIN_DEBUG)      += -g
 
 CFLAGS = $(CFLAGS-y)
 
-CPPFLAGS-y                                    += -D ALIGN_STRUCT_END=__attribute\(\(aligned\(4\)\)\)
-CPPFLAGS-y                                    += -D USE_FLOATING_POINT
+CPPFLAGS-y                                          += -D ALIGN_STRUCT_END=__attribute\(\(aligned\(4\)\)\)
+CPPFLAGS-y                                          += -D INCLUDE_AUTOCONF
+CPPFLAGS-$(CONFIG_PRINTF2_USE_FLOATING_POINT_ENA)   += -D USE_FLOATING_POINT
+CPPFLAGS-$(CONFIG_PRINTF2_TEST_EMBEDDED_ENA)        += -D TEST_EMBEDDED
+CPPFLAGS-$(CONFIG_PRINTF2_TEST_PRINTF_ENA)          += -D TEST_PRINTF
+CPPFLAGS-$(CONFIG_PRINTF2_TEST_EXPECTED_OUTPUT_ENA) += -D TEST_EXPECTED_OUTPUT
+CPPFLAGS-$(CONFIG_PRINTF2_NANOPB_OSTREAM_ENA)       += -D NANOPB_OSTREAM_ENA=1
+
 CPPFLAGS-y                                    += $(INCLUDE_DIRS-y)
 
 CFLAGS += $(CPPFLAGS-y)
@@ -186,14 +206,43 @@ SEP = '-----------------------------------------------------------------------+-
 
 .PHONY: all
 
-all: obj/printf2.a
+all: $(OBJ_DIR)printf2.a
 	@# This line prevents warning when nothing to be done for all.
+
+# test printf2 output versus Linux gcc stdio snprintf, printf
+.PHONY: runtest
+runtest :
+	@echo $(SEP)
+	@echo "+-- testing printf2 versus Linux gcc stdio snprintf, printf"
+	@echo $(SEP)
+	@echo "+-- gcc ... -DTEST_PRINTF -DTEST_EXPECTED_OUTPUT ... -o printf2Expected.exe"
+	$(Q)gcc -Wall -O2 -DTEST_PRINTF -DTEST_EXPECTED_OUTPUT -s source/printf2/printf2.c -Isource/ -I../nanopb-mirror -o printf2Expected.exe
+	@echo "+-- gcc ... -DTEST_PRINTF ... -o printf2Uut.exe"
+	$(Q)gcc -Wall -O2 -DTEST_PRINTF -s source/printf2/printf2.c -Isource/ -I../nanopb-mirror -o printf2Uut.exe
+	@echo "+-- gcc ... -DTEST_PRINTF -DUSE_FLOATING_POINT ... -o printf2UutFloat.exe"
+	$(Q)gcc -Wall -O2 -DTEST_PRINTF -DUSE_FLOATING_POINT -s source/printf2/printf2.c -Isource/ -I../nanopb-mirror -o printf2UutFloat.exe
+	@echo "+-- ./printf2Expected.exe outputs:"
+	$(Q)./printf2Expected.exe
+	@echo "+-- <end-of-output>"
+	@echo "+-- ./printf2Uut.exe outputs:"
+	$(Q)./printf2Uut.exe
+	@echo "+-- <end-of-output>"
+	@echo "+-- ./printf2UutFloat.exe outputs:"
+	$(Q)./printf2UutFloat.exe
+	@echo "+-- <end-of-output>"
+	@echo "+-- diff printf2Uut.exe output to printf2Expected output:"
+	$(Q)./printf2Expected.exe > expectedOutput.txt
+	$(Q)./printf2Uut.exe > uutOutput.txt
+	$(Q)if diff uutOutput.txt expectedOutput.txt; then echo "+-- Test Passed."; else echo "+-- Test Failed."; fi
+	@echo "+-- diff printf2UutFloat.exe output to printf2Expected output:"
+	$(Q)./printf2UutFloat.exe > uutOutputFloat.txt
+	$(Q)if diff uutOutputFloat.txt expectedOutput.txt; then echo "+-- Test Passed."; else echo "+-- Test Failed."; fi
 
 ifndef MAKECMDGOALS
 -include $(DEPS)
 else
 ifneq ($(MAKECMDGOALS),$(filter $(MAKECMDGOALS),\
-"help repos repostatus \
+"help runtest repos repostatus \
 menuconfig clean distclean config nconfig menuconfig \
 oldconfig silentoldconfig savedefconfig allnoconfig allyesconfig \
 alldefconfig randconfig listnewconfig olddefconfig "))
@@ -216,7 +265,7 @@ alldefconfig randconfig listnewconfig olddefconfig "))
 endif
 endif
 
-obj/printf2.a: $(OBJS)
+$(OBJ_DIR)printf2.a: $(OBJS)
 	@echo "+--$(AR) $@"
 	$(Q)$(AR) -rc $@ $^
 
@@ -266,13 +315,19 @@ doxygen :
 
 .PHONY: clean
 clean :
-ifneq ($(strip $(TOP_BUILD_DIR)),)
+ifneq ($(strip $(OBJ_DIR)),)
 	@echo $(SEP)
 	@echo "+--printf-stdarg-float library clean"
 	@echo $(SEP)
-	$(RM) -fr $(TOP_BUILD_DIR)*
+	$(RM) -f printf2Expected.exe
+	$(RM) -f printf2Uut.exe
+	$(RM) -f printf2UutFloat.exe
+	$(RM) -f expectedOutput.txt
+	$(RM) -f uutOutput.txt
+	$(RM) -f uutOutputFloat.txt
+	$(RM) -fr $(OBJ_DIR)*
 else
-	$(Q)echo "TOP_BUILD_DIR is not defined or empty, can't clean."
+	$(Q)echo "OBJ_DIR is not defined or empty, can't clean."
 endif
 
 .PHONY: distclean
@@ -290,6 +345,8 @@ help :
 	$(Q)echo ""
 	$(Q)echo "make repos            - git clone required brother repositories to \"cd ..\""
 	$(Q)echo "make                  - Build the executable software"
+	$(Q)echo ""
+	$(Q)echo "make runtest          - Test printf2 versus Linux gcc stdio snprintf, printf"
 	$(Q)echo ""
 	$(Q)echo "make all              - Build the executable software - same as \"make\""
 	$(Q)echo "make clean            - Clean build products"
