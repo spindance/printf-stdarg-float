@@ -40,6 +40,17 @@ typedef enum {
     PRINTF2_FLAGS_NO_TRAILING_NULL = 0x0001,
 } printf2_flags_type;
 
+int print (
+    #if USE_OSTREAM
+        pb_ostream_t *stream,
+    #else
+        char **out,
+    #endif
+    unsigned int flags,
+    unsigned int max_output_len,
+    const char *format,
+    va_list vargs);
+
 
 int stringff (char *out, unsigned int flags, const char *format, ...);
 int stringf (char *out, const char *format, ...);

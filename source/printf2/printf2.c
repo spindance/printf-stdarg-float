@@ -107,6 +107,8 @@ typedef  unsigned int   uint ;
 
 
 //****************************************************************************
+extern void  updateStackDepth(const char *, int logOn);
+
 static int printchar (
     #if USE_OSTREAM
         pb_ostream_t *stream,
@@ -117,6 +119,7 @@ static int printchar (
     unsigned int max_output_len,
     int *cur_output_char_p)
 {
+    updateStackDepth("printChar",0);
     if (max_output_len >= 0  &&  *cur_output_char_p >= max_output_len)
         return PRINTF2_OK;
 
@@ -393,7 +396,7 @@ static int printi (
 }
 
 //****************************************************************************
-static int print (
+int print (
     #if USE_OSTREAM
         pb_ostream_t *stream,
     #else
