@@ -863,13 +863,30 @@ int stringffnv(char *out, unsigned int flags, unsigned int max_len, const char *
                        &out,
                    #endif
                    flags,
-                   max_len, format, vargs);
+                   max_len,
+                   format,
+                   vargs
+    );
 }
 
 //****************************************************************************
 int stringfnv(char *out, unsigned int max_len, const char *format, va_list vargs)
 {
-    return stringffnv(out, PRINTF2_FLAGS_NONE, max_len, format, vargs);
+    #if USE_OSTREAM
+        pb_ostream_t oStream = pb_ostream_from_buffer((uint8_t *)out, max_len);
+    #endif
+
+    return print (
+                   #if USE_OSTREAM
+                       &oStream,
+                   #else
+                       &out,
+                   #endif
+                   PRINTF2_FLAGS_NONE,
+                   max_len,
+                   format,
+                   vargs
+    );
 }
 
 
@@ -892,6 +909,61 @@ int stringfnvs(pb_ostream_t *stream, unsigned int max_len, const char *format, v
                    max_len, format, vargs);
 }
 #endif
+
+//****************************************************************************
+int snprintf(char *str, size_t maxLen, const char *format, ...)
+{
+    #if USE_OSTREAM
+        pb_ostream_t oStream = pb_ostream_from_buffer((uint8_t *)str, maxLen);
+    #endif
+
+    va_list vargs;
+    va_start(vargs,format);
+
+    int charCnt = print(
+                        #if USE_OSTREAM
+                            &oStream,
+                        #else
+                            &str,
+                        #endif
+                        PRINTF2_FLAGS_NONE,
+                        (unsigned int)maxLen,
+                        format,
+                        vargs
+    );
+
+    va_end(vargs);
+
+    return charCnt;
+}
+
+//****************************************************************************
+int sprintf(char *str, const char *format, ...)
+{
+    #if USE_OSTREAM
+        pb_ostream_t oStream = pb_ostream_from_buffer((uint8_t *)str, UINT_MAX);
+    #endif
+
+    va_list vargs;
+    va_start(vargs,format);
+
+    int charCnt = print(
+                        #if USE_OSTREAM
+                            &oStream,
+                        #else
+                            &str,
+                        #endif
+                        PRINTF2_FLAGS_NONE,
+                        UINT_MAX,
+                        format,
+                        vargs
+    );
+
+    va_end(vargs);
+
+    return charCnt;
+}
+
 
 
 //****************************************************************************
